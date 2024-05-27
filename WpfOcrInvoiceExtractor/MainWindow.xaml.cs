@@ -1,23 +1,11 @@
-﻿using System.Diagnostics;
-using System.Drawing;
-using System.IO;
-using System.Reflection;
-using System.Security.Cryptography.Xml;
-using System.Text;
+﻿using System.Drawing;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
-using Ghostscript.NET;
 using Ghostscript.NET.Rasterizer;
 using Tesseract;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace WpfOcrInvoiceExtractor
 {
@@ -28,6 +16,8 @@ namespace WpfOcrInvoiceExtractor
     {
         private System.Windows.Point origin;
         private System.Windows.Point start;
+
+        private double baseScale;
         public MainWindow()
         {
             InitializeComponent();
@@ -51,30 +41,31 @@ namespace WpfOcrInvoiceExtractor
             invoice.MouseMove += image_MouseMove;
         }
 
-        //Position of mouse as center of scale point
-        //Top and bottom edges of image stick to top and bottom edges of window respectively
-        //If image is scaled so that sides go beyond window sides, make image sides stick to window sides 
-        //No panning image edge past visible window edge
+        //If entirety of image in view, disallow panning and outward scaling
+        //If image is scaled inward and image edges are hidden allow panning until image edge gets to respective window edge
         //Drawing rectangles on image
         //Extracting rectangles as images into new windows
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            TransformGroup group = new TransformGroup();
+            TransformGroup group = new();
 
-            ScaleTransform scTransform = new ScaleTransform();
-            scTransform.ScaleY = (this.Height - 40) / invoice.RenderSize.Height;
-            scTransform.ScaleX = scTransform.ScaleY;
-            scTransform.CenterX = invoice.RenderSize.Width / 2;
-            scTransform.CenterY = invoice.RenderSize.Height / 2;
+            ScaleTransform scTransform = new()
+            {
+                ScaleY = (this.Height - 40) / invoice.RenderSize.Height,
+                ScaleX = (this.Height - 40) / invoice.RenderSize.Height,
+                CenterX = invoice.RenderSize.Width / 2,
+                CenterY = invoice.RenderSize.Height / 2
+            };
 
+            baseScale = scTransform.ScaleX;
             group.Children.Add(scTransform);
 
-            TranslateTransform tt = new TranslateTransform();
+            TranslateTransform tt = new();
             group.Children.Add(tt);
 
             invoice.RenderTransform = group;
-
+   
             Canvas.SetLeft(invoice, (this.ActualWidth - (scTransform.ScaleX * invoice.RenderSize.Width)) / 2);
         }
 
@@ -89,8 +80,11 @@ namespace WpfOcrInvoiceExtractor
 
             var tt = (TranslateTransform)((TransformGroup)invoice.RenderTransform).Children.First(tr => tr is TranslateTransform);
             Vector v = start - e.GetPosition(imageCanvas);
+            var ta = invoice.TransformToAncestor(imageCanvas);
+            System.Windows.Point areaPosition = ta.Transform(new System.Windows.Point(0, 0));
+
             tt.X = origin.X - v.X;
-            tt.Y = origin.Y - v.Y;
+            tt.Y = origin.Y - v.Y;         
         }
 
         private void image_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -107,6 +101,7 @@ namespace WpfOcrInvoiceExtractor
             ScaleTransform transform = (ScaleTransform)transformGroup.Children[0];
 
             double zoom = e.Delta > 0 ? .03 : -.03;
+            if (zoom < 0 && transform.ScaleX + zoom <= baseScale) return;
             transform.ScaleX += zoom;
             transform.ScaleY += zoom;
         }
