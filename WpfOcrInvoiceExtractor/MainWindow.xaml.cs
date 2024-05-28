@@ -1,9 +1,11 @@
-﻿using System.Drawing;
+﻿using System.Diagnostics;
+using System.Drawing;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Media3D;
 using Ghostscript.NET.Rasterizer;
 using Tesseract;
 
@@ -78,21 +80,34 @@ namespace WpfOcrInvoiceExtractor
         {
             if (!invoice.IsMouseCaptured) return;
 
-            var tt = (TranslateTransform)((TransformGroup)invoice.RenderTransform).Children.First(tr => tr is TranslateTransform);
+            TransformGroup transformGroup = (TransformGroup)invoice.RenderTransform;
+            ScaleTransform scaleTransform = (ScaleTransform)transformGroup.Children[0];
+            var tt = (TranslateTransform)transformGroup.Children[1];
+
             Vector v = start - e.GetPosition(imageCanvas);
             var ta = invoice.TransformToAncestor(imageCanvas);
             System.Windows.Point areaPosition = ta.Transform(new System.Windows.Point(0, 0));
 
+            if ((areaPosition.X + 
+                scaleTransform.ScaleX * invoice.RenderSize.Width) < this.Width && v.X > 0) return;
+
+            //if (areaPosition.X > 0 && v.X > 0) return;
             tt.X = origin.X - v.X;
-            tt.Y = origin.Y - v.Y;         
+            tt.Y = origin.Y - v.Y;
         }
 
         private void image_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             invoice.CaptureMouse();
-            var tt = (TranslateTransform)((TransformGroup)invoice.RenderTransform).Children.First(tr => tr is TranslateTransform);
+            TransformGroup transformGroup = (TransformGroup)invoice.RenderTransform;
+            ScaleTransform scaleTransform = (ScaleTransform)transformGroup.Children[0];
+            var tt = (TranslateTransform)transformGroup.Children[1];
             start = e.GetPosition(imageCanvas);
             origin = new System.Windows.Point(tt.X, tt.Y);
+            var ta = invoice.TransformToAncestor(imageCanvas);
+            System.Windows.Point areaPosition = ta.Transform(new System.Windows.Point(0, 0));
+            Debug.WriteLine($"{areaPosition.X +
+                scaleTransform.ScaleX * invoice.RenderSize.Width} -- {this.Width}");
         }
 
         private void image_MouseWheel(object sender, MouseWheelEventArgs e)
