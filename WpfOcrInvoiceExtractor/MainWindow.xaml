@@ -9,7 +9,7 @@
     <Grid Background="Black">
         <Border ClipToBounds="True">
             <Canvas x:Name="imageCanvas">
-                <Grid Width="{Binding ActualWidth, ElementName=imageCanvas}" Height="{Binding ActualHeight, ElementName=imageCanvas}">
+                <Grid x:Name="imageGrid" Width="{Binding ActualWidth, ElementName=imageCanvas}" Height="{Binding ActualHeight, ElementName=imageCanvas}">
                     <Image x:Name="invoice" RenderOptions.BitmapScalingMode="HighQuality"></Image>
                 </Grid>
                 </Canvas>
