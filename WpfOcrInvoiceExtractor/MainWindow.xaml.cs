@@ -19,7 +19,6 @@ namespace WpfOcrInvoiceExtractor
     {
         private Point origin;
         private Point start;
-        private Point leftEdgeAtClick;
         private bool disableRightPanning;
         private bool disableLeftPanning;
         private bool disableUpPanning;
@@ -105,7 +104,7 @@ namespace WpfOcrInvoiceExtractor
             //Right side of image to right window edge
             Vector bottomRightSide = new Point(imageCanvas.RenderSize.Width, imageCanvas.RenderSize.Height) 
                 - new Point(areaPosition.X + (scaleTransform.ScaleX * invoice.RenderSize.Width), areaPosition.Y + (scaleTransform.ScaleY * invoice.RenderSize.Height));
-            
+
             Vector v = start - e.GetPosition(imageCanvas);
             if ((this.disableRightPanning && v.X < 0) || (this.disableLeftPanning && v.X > 0))
             {
@@ -118,7 +117,7 @@ namespace WpfOcrInvoiceExtractor
                 start.Y = e.GetPosition(imageCanvas).Y;
                 origin.Y = tt.Y;
             }
-
+            
             //If image is not scaled enough to overflow at edges, return
             ignoreHTrans = topLeftSide.X >= 0 && bottomRightSide.X >= 0;
             ignoreVTrans = topLeftSide.Y >= 0 && bottomRightSide.Y >= 0;
@@ -135,7 +134,7 @@ namespace WpfOcrInvoiceExtractor
             //If the translation is left to right...
             if (v.X < 0)
             {
-                if (this.disableRightPanning) return;
+                //if (this.disableRightPanning) return;
                 //If the translation has moved the left edge of the image past the left edge of the window...
                 if (topLeftSide.X + (hTranslation - tt.X) > 0)
                 {
@@ -143,11 +142,12 @@ namespace WpfOcrInvoiceExtractor
                     hTranslation = tt.X - topLeftSide.X;
                     this.disableRightPanning = true;
                 }
+                hTranslation = this.disableRightPanning ? tt.X : hTranslation;
             }
 
             if (v.X > 0) //Right to left translation
             {
-                if (this.disableLeftPanning) return;
+                //if (this.disableLeftPanning) return;
                 //If the translation has moved the right edge of the image past the right edge of the window...
                 if (bottomRightSide.X + (tt.X - hTranslation) > 0)
                 {
@@ -155,32 +155,35 @@ namespace WpfOcrInvoiceExtractor
                     hTranslation = tt.X + bottomRightSide.X;
                     this.disableLeftPanning = true;
                 }
+                hTranslation = this.disableLeftPanning ? tt.X : hTranslation;
             }
 
             //Downwards translation
             if (v.Y < 0)
             {
-                if (this.disableDownPanning) return;
+                //if (this.disableDownPanning) return;
                 //If the translation has moved the top edge of the image past the top edge of the window...
-                if (topLeftSide.Y + (tt.Y - vTranslation) > 0)
+                if (topLeftSide.Y + (vTranslation - tt.Y) > 0)
                 {
                     //Set the image at the top window edge
                     vTranslation = tt.Y - topLeftSide.Y;
                     this.disableDownPanning = true;
                 }
+                vTranslation = this.disableDownPanning ? tt.Y : vTranslation;
             }
 
             if (v.Y > 0) //Upwards translation
             {
-                if (this.disableUpPanning) return;
+                //if (this.disableUpPanning) return;
                 //If the translation has moved the bottom edge of the image past the bottom edge of the window...
-                if (bottomRightSide.Y + (vTranslation - tt.Y) > 0)
+                if (bottomRightSide.Y + (tt.Y - vTranslation) > 0)
                 {
                     //Set the image at the right window edge
                     vTranslation = tt.Y + bottomRightSide.Y;
                     this.disableUpPanning = true;
                 }
-            }
+                vTranslation = this.disableUpPanning ? tt.Y : vTranslation;
+             }
 
             tt.X = ignoreHTrans ? tt.X : hTranslation;
             tt.Y = ignoreVTrans ? tt.Y : vTranslation;
@@ -197,7 +200,7 @@ namespace WpfOcrInvoiceExtractor
             var ta = invoice.TransformToAncestor(this);
             Point areaPosition = ta.Transform(new Point(0, 0));
             Vector topLeftSide = areaPosition - new Point(0, 0);
-            Debug.WriteLine($"{topLeftSide} -- {imageCanvas.RenderSize}");
+            Debug.WriteLine($"{topLeftSide} -- {tt.Y}");
         }
 
         //If zooming out, must apply proper translations to re-center image

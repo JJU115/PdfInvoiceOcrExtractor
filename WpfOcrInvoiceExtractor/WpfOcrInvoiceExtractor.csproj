@@ -20,7 +20,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="wesco_264010700_20220521_23275357_9136520875-images-0.jpg" />
+    <Resource Include="wesco_264010700_20220521_23275357_9136520875-images-0.jpg">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Resource>
   </ItemGroup>
 
   <ItemGroup>
