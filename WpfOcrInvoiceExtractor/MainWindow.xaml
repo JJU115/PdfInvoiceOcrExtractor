@@ -6,10 +6,10 @@
         xmlns:local="clr-namespace:WpfOcrInvoiceExtractor"
         mc:Ignorable="d"
         Title="MainWindow"  Left="0" Top="0" d:DesignHeight="240.521" d:DesignWidth="247.035">
-    <Grid Background="Black">
+    <Grid x:Name="imageGrid" Background="Black">
         <Border ClipToBounds="True">
             <Canvas x:Name="imageCanvas">
-                <Grid x:Name="imageGrid" Width="{Binding ActualWidth, ElementName=imageCanvas}" Height="{Binding ActualHeight, ElementName=imageCanvas}">
+                <Grid Width="{Binding ActualWidth, ElementName=imageCanvas}" Height="{Binding ActualHeight, ElementName=imageCanvas}">
                     <Image x:Name="invoice" RenderOptions.BitmapScalingMode="HighQuality" Cursor="ScrollAll"></Image>
                 </Grid>
                 </Canvas>

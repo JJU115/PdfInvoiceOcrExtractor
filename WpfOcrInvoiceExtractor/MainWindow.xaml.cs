@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Media3D;
 using Ghostscript.NET.Rasterizer;
 using Tesseract;
 
@@ -76,6 +77,9 @@ namespace WpfOcrInvoiceExtractor
             TranslateTransform tt = new();
             group.Children.Add(tt);
 
+            MatrixTransform mt = new();
+            group.Children.Add(mt);
+
             invoice.RenderTransform = group;
    
             Canvas.SetLeft(invoice, (this.ActualWidth - (scTransform.ScaleX * invoice.RenderSize.Width)) / 2);
@@ -97,13 +101,13 @@ namespace WpfOcrInvoiceExtractor
             Point areaPosition = ta.Transform(new Point(0, 0));
 
             TransformGroup transformGroup = (TransformGroup)invoice.RenderTransform;
-            ScaleTransform scaleTransform = (ScaleTransform)transformGroup.Children[0];
             var tt = (TranslateTransform)transformGroup.Children[1];
+            MatrixTransform matrixTransform = (MatrixTransform)transformGroup.Children[2];
 
             Vector topLeftSide = areaPosition - new Point(0,0);
             //Right side of image to right window edge
-            Vector bottomRightSide = new Point(imageCanvas.RenderSize.Width, imageCanvas.RenderSize.Height) 
-                - new Point(areaPosition.X + (scaleTransform.ScaleX * invoice.RenderSize.Width), areaPosition.Y + (scaleTransform.ScaleY * invoice.RenderSize.Height));
+            Vector bottomRightSide = new Point(imageGrid.ActualWidth + 4, imageGrid.ActualHeight + 4) 
+                - new Point(areaPosition.X + (matrixTransform.Matrix.M11 * invoice.RenderSize.Width), areaPosition.Y + (matrixTransform.Matrix.M22 * invoice.RenderSize.Height));
 
             Vector v = start - e.GetPosition(imageCanvas);
             if ((this.disableRightPanning && v.X < 0) || (this.disableLeftPanning && v.X > 0))
@@ -135,54 +139,58 @@ namespace WpfOcrInvoiceExtractor
             if (v.X < 0)
             {
                 //if (this.disableRightPanning) return;
+                hTranslation = this.disableRightPanning ? tt.X : hTranslation;
                 //If the translation has moved the left edge of the image past the left edge of the window...
-                if (topLeftSide.X + (hTranslation - tt.X) > 0)
+                if (topLeftSide.X + (hTranslation - tt.X) >= 0)
                 {
                     //Set the image at the left window edge
                     hTranslation = tt.X - topLeftSide.X;
                     this.disableRightPanning = true;
                 }
-                hTranslation = this.disableRightPanning ? tt.X : hTranslation;
+                
             }
 
             if (v.X > 0) //Right to left translation
             {
                 //if (this.disableLeftPanning) return;
+                hTranslation = this.disableLeftPanning ? tt.X : hTranslation;
                 //If the translation has moved the right edge of the image past the right edge of the window...
-                if (bottomRightSide.X + (tt.X - hTranslation) > 0)
+                if (bottomRightSide.X + (tt.X - hTranslation) >= 0)
                 {
                     //Set the image at the right window edge
                     hTranslation = tt.X + bottomRightSide.X;
                     this.disableLeftPanning = true;
                 }
-                hTranslation = this.disableLeftPanning ? tt.X : hTranslation;
+                
             }
 
             //Downwards translation
             if (v.Y < 0)
             {
                 //if (this.disableDownPanning) return;
+                vTranslation = this.disableDownPanning ? tt.Y : vTranslation;
                 //If the translation has moved the top edge of the image past the top edge of the window...
-                if (topLeftSide.Y + (vTranslation - tt.Y) > 0)
+                if (topLeftSide.Y + (vTranslation - tt.Y) >= 0)
                 {
                     //Set the image at the top window edge
                     vTranslation = tt.Y - topLeftSide.Y;
                     this.disableDownPanning = true;
                 }
-                vTranslation = this.disableDownPanning ? tt.Y : vTranslation;
+                
             }
 
             if (v.Y > 0) //Upwards translation
             {
                 //if (this.disableUpPanning) return;
+                vTranslation = this.disableUpPanning ? tt.Y : vTranslation;
                 //If the translation has moved the bottom edge of the image past the bottom edge of the window...
-                if (bottomRightSide.Y + (tt.Y - vTranslation) > 0)
+                if (bottomRightSide.Y + (tt.Y - vTranslation) >= 0)
                 {
                     //Set the image at the right window edge
                     vTranslation = tt.Y + bottomRightSide.Y;
                     this.disableUpPanning = true;
                 }
-                vTranslation = this.disableUpPanning ? tt.Y : vTranslation;
+                
              }
 
             tt.X = ignoreHTrans ? tt.X : hTranslation;
@@ -193,26 +201,39 @@ namespace WpfOcrInvoiceExtractor
         {
             invoice.CaptureMouse();
             TransformGroup transformGroup = (TransformGroup)invoice.RenderTransform;
-            ScaleTransform scaleTransform = (ScaleTransform)transformGroup.Children[0];
+            MatrixTransform matrixTransform = (MatrixTransform)transformGroup.Children[2];
             var tt = (TranslateTransform)transformGroup.Children[1];
             start = e.GetPosition(imageCanvas);
             origin = new Point(tt.X, tt.Y);
             var ta = invoice.TransformToAncestor(this);
             Point areaPosition = ta.Transform(new Point(0, 0));
             Vector topLeftSide = areaPosition - new Point(0, 0);
-            Debug.WriteLine($"{topLeftSide} -- {tt.Y}");
+            Vector bottomRightSide = new Point(imageGrid.ActualWidth, imageGrid.ActualHeight)
+                - new Point(areaPosition.X + (matrixTransform.Matrix.M11 * invoice.RenderSize.Width), areaPosition.Y + (matrixTransform.Matrix.M22 * invoice.RenderSize.Height));
         }
 
         //If zooming out, must apply proper translations to re-center image
         private void image_MouseWheel(object sender, MouseWheelEventArgs e)
         {
             TransformGroup transformGroup = (TransformGroup)invoice.RenderTransform;
-            ScaleTransform transform = (ScaleTransform)transformGroup.Children[0];
+            MatrixTransform matrixTransform = (MatrixTransform)transformGroup.Children[2];
 
-            double zoom = e.Delta > 0 ? .03 : -.03;
-            if (zoom < 0 && transform.ScaleX + zoom <= baseScale) return;
-            transform.ScaleX += zoom;
-            transform.ScaleY += zoom;
+            var element = (UIElement)sender;
+            var position = e.GetPosition(element);
+            var matrix = matrixTransform.Matrix;
+            var scale = e.Delta >= 0 ? 1.01 : (1.09 / 1.1);
+
+            if (e.Delta < 0 && matrix.M11 * scale <= this.baseScale)
+            {
+                matrix.M11 = this.baseScale;
+                matrix.M22 = this.baseScale;
+            } 
+            else
+            {
+                matrix.ScaleAtPrepend(scale, scale, 0, 0);
+            }          
+            matrixTransform.Matrix = matrix;
+            Debug.WriteLine($"{matrix}");
         }
 
 
