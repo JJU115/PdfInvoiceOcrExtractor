@@ -54,35 +54,20 @@ namespace WpfOcrInvoiceExtractor
             this.disableUpPanning = false;
         }
 
-        //If entirety of image in view, disallow panning and outward scaling
-        //If image is scaled inward and image edges are hidden allow panning until image edge gets to respective window edge
+        //Zooming out always re-centers image and doesn't allow space between top and bottom edges
+        //  - If no image edge is stuck, zoom out is from mouse position
+        //  - Any stuck edges stay stuck when zooming out (max 2) until certain scale reached
+        //  - Top and bottom edges always end up stuck to window edge, sides separate and always have equal width of image to window edge 
+        //Animating zoom in/out?
         //Drawing rectangles on image
         //Extracting rectangles as images into new windows
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            TransformGroup group = new();
-
-            ScaleTransform scTransform = new()
-            {
-                ScaleY = (this.Height - 40) / invoice.RenderSize.Height,
-                ScaleX = (this.Height - 40) / invoice.RenderSize.Height,
-                CenterX = invoice.RenderSize.Width / 2,
-                CenterY = invoice.RenderSize.Height / 2
-            };
-
-            baseScale = scTransform.ScaleX;
-            group.Children.Add(scTransform);
-
-            TranslateTransform tt = new();
-            group.Children.Add(tt);
-
-            MatrixTransform mt = new();
-            group.Children.Add(mt);
-
-            invoice.RenderTransform = group;
-   
-            Canvas.SetLeft(invoice, (this.ActualWidth - (scTransform.ScaleX * invoice.RenderSize.Width)) / 2);
+            Matrix mtx = new Matrix((this.Height - 38) / invoice.RenderSize.Height, 0, 0, (this.Height - 38) / invoice.RenderSize.Height, 0, 0);
+            baseScale = mtx.M11;
+            invoice.RenderTransform = new MatrixTransform(mtx);
+            Canvas.SetLeft(invoice, (this.ActualWidth - (mtx.M11 * invoice.RenderSize.Width)) / 2);
         }
 
         private void image_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -100,9 +85,10 @@ namespace WpfOcrInvoiceExtractor
             var ta = invoice.TransformToAncestor(imageCanvas);
             Point areaPosition = ta.Transform(new Point(0, 0));
 
-            TransformGroup transformGroup = (TransformGroup)invoice.RenderTransform;
-            var tt = (TranslateTransform)transformGroup.Children[1];
-            MatrixTransform matrixTransform = (MatrixTransform)transformGroup.Children[2];
+            MatrixTransform matrixTransform = (MatrixTransform)invoice.RenderTransform;
+            var matrix = matrixTransform.Matrix;
+            double offsetX = matrixTransform.Matrix.OffsetX;
+            double offsetY = matrixTransform.Matrix.OffsetY;
 
             Vector topLeftSide = areaPosition - new Point(0,0);
             //Right side of image to right window edge
@@ -113,13 +99,13 @@ namespace WpfOcrInvoiceExtractor
             if ((this.disableRightPanning && v.X < 0) || (this.disableLeftPanning && v.X > 0))
             {
                 start.X = e.GetPosition(imageCanvas).X;
-                origin.X = tt.X;
+                origin.X = offsetX;
             }
 
             if ((this.disableUpPanning && v.Y > 0) || (this.disableDownPanning && v.Y < 0))
             {
                 start.Y = e.GetPosition(imageCanvas).Y;
-                origin.Y = tt.Y;
+                origin.Y = offsetY;
             }
             
             //If image is not scaled enough to overflow at edges, return
@@ -130,8 +116,7 @@ namespace WpfOcrInvoiceExtractor
             this.disableLeftPanning = bottomRightSide.X >= 0;
             this.disableDownPanning = topLeftSide.Y >= 0;
             this.disableUpPanning = bottomRightSide.Y >= 0;
-            
-            //Image is overflowing at edges     
+   
             double hTranslation = origin.X - v.X;
             double vTranslation = origin.Y - v.Y;
             
@@ -139,12 +124,12 @@ namespace WpfOcrInvoiceExtractor
             if (v.X < 0)
             {
                 //if (this.disableRightPanning) return;
-                hTranslation = this.disableRightPanning ? tt.X : hTranslation;
+                hTranslation = this.disableRightPanning ? offsetX : hTranslation;
                 //If the translation has moved the left edge of the image past the left edge of the window...
-                if (topLeftSide.X + (hTranslation - tt.X) >= 0)
+                if (topLeftSide.X + (hTranslation - offsetX) >= 0)
                 {
                     //Set the image at the left window edge
-                    hTranslation = tt.X - topLeftSide.X;
+                    hTranslation = offsetX - topLeftSide.X;
                     this.disableRightPanning = true;
                 }
                 
@@ -153,12 +138,12 @@ namespace WpfOcrInvoiceExtractor
             if (v.X > 0) //Right to left translation
             {
                 //if (this.disableLeftPanning) return;
-                hTranslation = this.disableLeftPanning ? tt.X : hTranslation;
+                hTranslation = this.disableLeftPanning ? offsetX : hTranslation;
                 //If the translation has moved the right edge of the image past the right edge of the window...
-                if (bottomRightSide.X + (tt.X - hTranslation) >= 0)
+                if (bottomRightSide.X + (offsetX - hTranslation) >= 0)
                 {
                     //Set the image at the right window edge
-                    hTranslation = tt.X + bottomRightSide.X;
+                    hTranslation = offsetX + bottomRightSide.X;
                     this.disableLeftPanning = true;
                 }
                 
@@ -168,12 +153,12 @@ namespace WpfOcrInvoiceExtractor
             if (v.Y < 0)
             {
                 //if (this.disableDownPanning) return;
-                vTranslation = this.disableDownPanning ? tt.Y : vTranslation;
+                vTranslation = this.disableDownPanning ? offsetY : vTranslation;
                 //If the translation has moved the top edge of the image past the top edge of the window...
-                if (topLeftSide.Y + (vTranslation - tt.Y) >= 0)
+                if (topLeftSide.Y + (vTranslation - offsetY) >= 0)
                 {
                     //Set the image at the top window edge
-                    vTranslation = tt.Y - topLeftSide.Y;
+                    vTranslation = offsetY - topLeftSide.Y;
                     this.disableDownPanning = true;
                 }
                 
@@ -182,41 +167,41 @@ namespace WpfOcrInvoiceExtractor
             if (v.Y > 0) //Upwards translation
             {
                 //if (this.disableUpPanning) return;
-                vTranslation = this.disableUpPanning ? tt.Y : vTranslation;
+                vTranslation = this.disableUpPanning ? offsetY : vTranslation;
                 //If the translation has moved the bottom edge of the image past the bottom edge of the window...
-                if (bottomRightSide.Y + (tt.Y - vTranslation) >= 0)
+                if (bottomRightSide.Y + (offsetY - vTranslation) >= 0)
                 {
                     //Set the image at the right window edge
-                    vTranslation = tt.Y + bottomRightSide.Y;
+                    vTranslation = offsetY + bottomRightSide.Y;
                     this.disableUpPanning = true;
                 }
                 
-             }
-
-            tt.X = ignoreHTrans ? tt.X : hTranslation;
-            tt.Y = ignoreVTrans ? tt.Y : vTranslation;
+            }
+            
+            matrix.OffsetX = ignoreHTrans ? offsetX : hTranslation;
+            matrix.OffsetY = ignoreVTrans ? offsetY : vTranslation;
+            matrixTransform.Matrix = matrix;
         }
 
         private void image_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             invoice.CaptureMouse();
-            TransformGroup transformGroup = (TransformGroup)invoice.RenderTransform;
-            MatrixTransform matrixTransform = (MatrixTransform)transformGroup.Children[2];
-            var tt = (TranslateTransform)transformGroup.Children[1];
+            MatrixTransform matrixTransform = (MatrixTransform)invoice.RenderTransform;
+            var matrix = matrixTransform.Matrix;
             start = e.GetPosition(imageCanvas);
-            origin = new Point(tt.X, tt.Y);
+            origin = new Point(matrix.OffsetX, matrix.OffsetY);
             var ta = invoice.TransformToAncestor(this);
             Point areaPosition = ta.Transform(new Point(0, 0));
             Vector topLeftSide = areaPosition - new Point(0, 0);
             Vector bottomRightSide = new Point(imageGrid.ActualWidth, imageGrid.ActualHeight)
                 - new Point(areaPosition.X + (matrixTransform.Matrix.M11 * invoice.RenderSize.Width), areaPosition.Y + (matrixTransform.Matrix.M22 * invoice.RenderSize.Height));
+            Debug.WriteLine($"{matrix} -- {bottomRightSide.Y}");
         }
 
         //If zooming out, must apply proper translations to re-center image
         private void image_MouseWheel(object sender, MouseWheelEventArgs e)
         {
-            TransformGroup transformGroup = (TransformGroup)invoice.RenderTransform;
-            MatrixTransform matrixTransform = (MatrixTransform)transformGroup.Children[2];
+            MatrixTransform matrixTransform = (MatrixTransform)invoice.RenderTransform;
 
             var element = (UIElement)sender;
             var position = e.GetPosition(element);
@@ -230,10 +215,9 @@ namespace WpfOcrInvoiceExtractor
             } 
             else
             {
-                matrix.ScaleAtPrepend(scale, scale, 0, 0);
+                matrix.ScaleAtPrepend(scale, scale, position.X, position.Y);
             }          
             matrixTransform.Matrix = matrix;
-            Debug.WriteLine($"{matrix}");
         }
 
 
