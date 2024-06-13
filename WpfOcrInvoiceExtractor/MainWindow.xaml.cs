@@ -204,20 +204,57 @@ namespace WpfOcrInvoiceExtractor
             MatrixTransform matrixTransform = (MatrixTransform)invoice.RenderTransform;
 
             var element = (UIElement)sender;
-            var position = e.GetPosition(element);
+            var position = invoice.TransformToAncestor(imageCanvas).Transform(e.GetPosition(element));
             var matrix = matrixTransform.Matrix;
-            var scale = e.Delta >= 0 ? 1.01 : (1.09 / 1.1);
+            var scale = e.Delta >= 0 ? 1.1 : (1.00 / 1.1);
 
-            if (e.Delta < 0 && matrix.M11 * scale <= this.baseScale)
+            if (matrix.M11 == baseScale && e.Delta < 0) return;
+
+            Point topLeftCorner = invoice.TransformToAncestor(imageCanvas).Transform(new Point(0, 0));
+            Point bottomRightCorner = new Point(topLeftCorner.X + (matrixTransform.Matrix.M11 * invoice.RenderSize.Width), topLeftCorner.Y + (matrixTransform.Matrix.M22 * invoice.RenderSize.Height));
+
+            
+
+             if (e.Delta >=0 && invoice.RenderSize.Width * matrix.M11 * scale > this.ActualWidth)
             {
-                matrix.M11 = this.baseScale;
-                matrix.M22 = this.baseScale;
-            } 
+                //No side space left
+                matrix.ScaleAtPrepend(scale, scale, position.X, position.Y);
+            }
             else
             {
-                matrix.ScaleAtPrepend(scale, scale, position.X, position.Y);
-            }          
+                    
+                if (e.Delta < 0)
+                {
+                    if (matrix.M11 * scale <= this.baseScale)
+                    {
+                        scale = baseScale / matrix.M11;
+                    }
+                    //Following calculations of new y coordinates are fairly accurate, more so if Position is closer to the top
+                    //If right at the bottom, calculation is off by ~4, if right at top calculation is within ~0.05
+                    //Scaling the image in more increases error after this correction by up to ~4 pixels, but at those levels we don't need accurate coordinates
+                    double oldHeight = invoice.RenderSize.Height * matrix.M11;
+                    double newHeight = oldHeight * scale;
+                    double heightDiff = oldHeight - newHeight;
+                    double topYNew = topLeftCorner.Y + (position.Y / this.Height) * heightDiff + ((position.Y / this.Height) * 4);
+                    double bottomYNew = topYNew + newHeight;
+                    Debug.WriteLine($"{topYNew}");
+
+                    if (topYNew > 0)
+                    {
+                        matrix.OffsetY -= topYNew;
+                    }
+
+                    if (bottomYNew < this.Height)
+                    {
+                        matrix.OffsetY += this.Height - bottomYNew - 35;
+                    }
+                }
+                matrix.ScaleAtPrepend(scale, scale, invoice.ActualWidth / 2, position.Y);                              
+            }
             matrixTransform.Matrix = matrix;
+            topLeftCorner = invoice.TransformToAncestor(imageCanvas).Transform(new Point(0, 0));
+            bottomRightCorner = new Point(topLeftCorner.X + (matrixTransform.Matrix.M11 * invoice.RenderSize.Width), topLeftCorner.Y + (matrixTransform.Matrix.M22 * invoice.RenderSize.Height));
+            Debug.WriteLine($"{topLeftCorner.Y}");
         }
 
 
