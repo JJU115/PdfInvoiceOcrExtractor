@@ -5,11 +5,13 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Media3D;
 using Ghostscript.NET.Rasterizer;
 using Tesseract;
 
 using Point = System.Windows.Point;
+using Size = System.Windows.Size;
 
 namespace WpfOcrInvoiceExtractor
 {
@@ -43,6 +45,7 @@ namespace WpfOcrInvoiceExtractor
             invoice.Source = bitmapSource;           
 
             this.Loaded += MainWindow_Loaded;
+            this.KeyDown += OnKeyDownHandler;
             invoice.MouseWheel += image_MouseWheel;
             invoice.MouseLeftButtonDown += image_MouseLeftButtonDown;
             invoice.MouseLeftButtonUp += image_MouseLeftButtonUp;
@@ -68,6 +71,17 @@ namespace WpfOcrInvoiceExtractor
             baseScale = mtx.M11;
             invoice.RenderTransform = new MatrixTransform(mtx);
             Canvas.SetLeft(invoice, (this.ActualWidth - (mtx.M11 * invoice.RenderSize.Width)) / 2);
+        }
+
+        private void OnKeyDownHandler(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.R)
+            {
+                Matrix mtx = new Matrix((this.Height - 37) / invoice.RenderSize.Height, 0, 0, (this.Height - 37) / invoice.RenderSize.Height, 0, 0);
+                baseScale = mtx.M11;
+                invoice.RenderTransform = new MatrixTransform(mtx);
+                Canvas.SetLeft(invoice, (this.ActualWidth - (mtx.M11 * invoice.RenderSize.Width)) / 2);
+            }
         }
 
         private void image_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -202,59 +216,58 @@ namespace WpfOcrInvoiceExtractor
         private void image_MouseWheel(object sender, MouseWheelEventArgs e)
         {
             MatrixTransform matrixTransform = (MatrixTransform)invoice.RenderTransform;
-
+            
             var element = (UIElement)sender;
-            var position = invoice.TransformToAncestor(imageCanvas).Transform(e.GetPosition(element));
+            var position = Mouse.GetPosition(invoice);         
             var matrix = matrixTransform.Matrix;
-            var scale = e.Delta >= 0 ? 1.1 : (1.00 / 1.1);
+            var scale = e.Delta >= 0 ? 1.12 : (1.00 / 1.12);
 
             if (matrix.M11 == baseScale && e.Delta < 0) return;
 
             Point topLeftCorner = invoice.TransformToAncestor(imageCanvas).Transform(new Point(0, 0));
-            Point bottomRightCorner = new Point(topLeftCorner.X + (matrixTransform.Matrix.M11 * invoice.RenderSize.Width), topLeftCorner.Y + (matrixTransform.Matrix.M22 * invoice.RenderSize.Height));
-
-            
-
-             if (e.Delta >=0 && invoice.RenderSize.Width * matrix.M11 * scale > this.ActualWidth)
+            Point bottomRightCorner = new Point(topLeftCorner.X + (matrix.M11 * invoice.RenderSize.Width), topLeftCorner.Y + (matrix.M22 * invoice.RenderSize.Height));
+            if (e.Delta >=0 && invoice.RenderSize.Width * matrix.M11 >= this.ActualWidth)
             {
                 //No side space left
                 matrix.ScaleAtPrepend(scale, scale, position.X, position.Y);
             }
             else
             {
-                    
+                //Zoom out
                 if (e.Delta < 0)
                 {
                     if (matrix.M11 * scale <= this.baseScale)
                     {
                         scale = baseScale / matrix.M11;
                     }
-                    //Following calculations of new y coordinates are fairly accurate, more so if Position is closer to the top
-                    //If right at the bottom, calculation is off by ~4, if right at top calculation is within ~0.05
-                    //Scaling the image in more increases error after this correction by up to ~4 pixels, but at those levels we don't need accurate coordinates
-                    double oldHeight = invoice.RenderSize.Height * matrix.M11;
-                    double newHeight = oldHeight * scale;
-                    double heightDiff = oldHeight - newHeight;
-                    double topYNew = topLeftCorner.Y + (position.Y / this.Height) * heightDiff + ((position.Y / this.Height) * 4);
-                    double bottomYNew = topYNew + newHeight;
-                    Debug.WriteLine($"{topYNew}");
 
-                    if (topYNew > 0)
-                    {
-                        matrix.OffsetY -= topYNew;
-                    }
+                    Size oldSize = new(invoice.RenderSize.Width * matrix.M11, invoice.RenderSize.Height * matrix.M11);
+                    Size newSize = new(oldSize.Width * scale, oldSize.Height * scale);
+                    double topYNew = topLeftCorner.Y + (position.Y / invoice.RenderSize.Height) * (oldSize.Height - newSize.Height);
+                    double leftXNew = topLeftCorner.X + (position.X / invoice.RenderSize.Width) * (oldSize.Width - newSize.Width);
+                    double bottomYNew = topYNew + newSize.Height;
+                    double rightXNew = leftXNew + newSize.Width;
 
-                    if (bottomYNew < this.Height)
-                    {
-                        matrix.OffsetY += this.Height - bottomYNew - 35;
-                    }
+                    Debug.WriteLine($"Left New: {leftXNew} -- Right new {rightXNew}");
+                
+                    //Doesn't seem to work... When side space appears on either or both sides, total amount should be evenly split among both sides
+                    if (leftXNew > 0) matrix.OffsetX -= leftXNew;
+                    if (rightXNew < imageGrid.ActualWidth) matrix.OffsetX += imageGrid.ActualWidth - rightXNew;
+
+                    if (topYNew > 0) matrix.OffsetY -= topYNew;                 
+                    if (bottomYNew < this.Height) matrix.OffsetY += this.Height - bottomYNew - 35;
+                    
+                } 
+                else //Zoom in
+                {
+                    //Zoom in and there is still side space between the image and the window
+                    position.X = invoice.RenderSize.Width / 2;
                 }
-                matrix.ScaleAtPrepend(scale, scale, invoice.ActualWidth / 2, position.Y);                              
+                matrix.ScaleAtPrepend(scale, scale, position.X, position.Y);                              
             }
             matrixTransform.Matrix = matrix;
             topLeftCorner = invoice.TransformToAncestor(imageCanvas).Transform(new Point(0, 0));
             bottomRightCorner = new Point(topLeftCorner.X + (matrixTransform.Matrix.M11 * invoice.RenderSize.Width), topLeftCorner.Y + (matrixTransform.Matrix.M22 * invoice.RenderSize.Height));
-            Debug.WriteLine($"{topLeftCorner.Y}");
         }
 
 
