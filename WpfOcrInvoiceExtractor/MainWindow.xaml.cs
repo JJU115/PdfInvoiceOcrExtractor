@@ -236,10 +236,7 @@ namespace WpfOcrInvoiceExtractor
                 //Zoom out
                 if (e.Delta < 0)
                 {
-                    if (matrix.M11 * scale <= this.baseScale)
-                    {
-                        scale = baseScale / matrix.M11;
-                    }
+                    if (matrix.M11 * scale <= this.baseScale) scale = baseScale / matrix.M11;                   
 
                     Size oldSize = new(invoice.RenderSize.Width * matrix.M11, invoice.RenderSize.Height * matrix.M11);
                     Size newSize = new(oldSize.Width * scale, oldSize.Height * scale);
@@ -247,15 +244,19 @@ namespace WpfOcrInvoiceExtractor
                     double leftXNew = topLeftCorner.X + (position.X / invoice.RenderSize.Width) * (oldSize.Width - newSize.Width);
                     double bottomYNew = topYNew + newSize.Height;
                     double rightXNew = leftXNew + newSize.Width;
+                    double desiredSideSpace = (leftXNew + imageGrid.ActualWidth - rightXNew) / 2;
 
-                    Debug.WriteLine($"Left New: {leftXNew} -- Right new {rightXNew}");
-                
-                    //Doesn't seem to work... When side space appears on either or both sides, total amount should be evenly split among both sides
-                    if (leftXNew > 0) matrix.OffsetX -= leftXNew;
-                    if (rightXNew < imageGrid.ActualWidth) matrix.OffsetX += imageGrid.ActualWidth - rightXNew;
+                    //If left edge would be separated from window edge..
+                    if (leftXNew > 0)
+                    {
+                        matrix.OffsetX -= leftXNew - (invoice.RenderSize.Width * matrix.M11 * scale > imageGrid.ActualWidth ? 0 : desiredSideSpace);
+                    }
+                    else if (rightXNew < imageGrid.ActualWidth) {
+                        matrix.OffsetX += (imageGrid.ActualWidth - rightXNew);
+                    }
 
                     if (topYNew > 0) matrix.OffsetY -= topYNew;                 
-                    if (bottomYNew < this.Height) matrix.OffsetY += this.Height - bottomYNew - 35;
+                    if (bottomYNew < imageGrid.ActualHeight) matrix.OffsetY += imageGrid.ActualHeight - bottomYNew;
                     
                 } 
                 else //Zoom in
@@ -268,6 +269,7 @@ namespace WpfOcrInvoiceExtractor
             matrixTransform.Matrix = matrix;
             topLeftCorner = invoice.TransformToAncestor(imageCanvas).Transform(new Point(0, 0));
             bottomRightCorner = new Point(topLeftCorner.X + (matrixTransform.Matrix.M11 * invoice.RenderSize.Width), topLeftCorner.Y + (matrixTransform.Matrix.M22 * invoice.RenderSize.Height));
+            Debug.WriteLine($"Left Space: {topLeftCorner.X}, Right Space: {imageGrid.ActualWidth - bottomRightCorner.X}");
         }
 
 
