@@ -5,13 +5,14 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Media.Animation;
-using System.Windows.Media.Media3D;
+using System.Windows.Media.Imaging;
 using Ghostscript.NET.Rasterizer;
 using Tesseract;
 
 using Point = System.Windows.Point;
 using Size = System.Windows.Size;
+using Rect = System.Windows.Rect;
+using Brushes = System.Windows.Media.Brushes;
 
 namespace WpfOcrInvoiceExtractor
 {
@@ -28,6 +29,7 @@ namespace WpfOcrInvoiceExtractor
         private bool disableDownPanning;
 
         private double baseScale;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -42,12 +44,14 @@ namespace WpfOcrInvoiceExtractor
                  IntPtr.Zero,
                  new Int32Rect(0, 0, oldBitmap.Width, oldBitmap.Height),
                  null);
-            invoice.Source = bitmapSource;           
+            invoice.Source = bitmapSource;    
 
             this.Loaded += MainWindow_Loaded;
             this.KeyDown += OnKeyDownHandler;
             invoice.MouseWheel += image_MouseWheel;
             invoice.MouseLeftButtonDown += image_MouseLeftButtonDown;
+            invoice.MouseRightButtonDown += image_MouseRightButtonDown;
+            invoice.MouseRightButtonUp += image_MouseRightButtonUp;
             invoice.MouseLeftButtonUp += image_MouseLeftButtonUp;
             invoice.MouseMove += image_MouseMove;
 
@@ -212,7 +216,31 @@ namespace WpfOcrInvoiceExtractor
             Debug.WriteLine($"{matrix} -- {bottomRightSide.Y}");
         }
 
-        //If zooming out, must apply proper translations to re-center image
+
+        private void image_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            //Also need to change the event handler for mouse move as long as the right mouse button is held down
+            Point startPoint = e.GetPosition(invoice);
+
+            Rect rect = new Rect();
+
+            Canvas.SetLeft(rect, startPoint.X);
+            Canvas.SetTop(rect, startPoint.Y);
+
+            imageControl.MouseMove += ImageControl_MouseMove;
+            imageControl.MouseUp += ImageControl_MouseUp;
+
+            // Add the rectangle to a canvas or grid that overlays the image
+            // Example assuming you have a Canvas named canvasOverlay:
+            canvasOverlay.Children.Add(rect);
+        }
+
+        private void image_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            //Finalize the rectangle on the canvas overlay and set the mouse move handler back to the panning handler
+        }
+
+
         private void image_MouseWheel(object sender, MouseWheelEventArgs e)
         {
             MatrixTransform matrixTransform = (MatrixTransform)invoice.RenderTransform;
@@ -228,7 +256,6 @@ namespace WpfOcrInvoiceExtractor
             Point bottomRightCorner = new Point(topLeftCorner.X + (matrix.M11 * invoice.RenderSize.Width), topLeftCorner.Y + (matrix.M22 * invoice.RenderSize.Height));
             if (e.Delta >=0 && invoice.RenderSize.Width * matrix.M11 >= this.ActualWidth)
             {
-                //No side space left
                 matrix.ScaleAtPrepend(scale, scale, position.X, position.Y);
             }
             else
@@ -267,11 +294,12 @@ namespace WpfOcrInvoiceExtractor
                 matrix.ScaleAtPrepend(scale, scale, position.X, position.Y);                              
             }
             matrixTransform.Matrix = matrix;
-            topLeftCorner = invoice.TransformToAncestor(imageCanvas).Transform(new Point(0, 0));
-            bottomRightCorner = new Point(topLeftCorner.X + (matrixTransform.Matrix.M11 * invoice.RenderSize.Width), topLeftCorner.Y + (matrixTransform.Matrix.M22 * invoice.RenderSize.Height));
-            Debug.WriteLine($"Left Space: {topLeftCorner.X}, Right Space: {imageGrid.ActualWidth - bottomRightCorner.X}");
+            /*MatrixAnimator animator = new MatrixAnimator(matrixTransform.Matrix, matrix, new Duration(TimeSpan.FromMilliseconds(250)));
+            animator.From = matrixTransform.Matrix;
+            animator.To = matrix;
+            matrixTransform.BeginAnimation(MatrixTransform.MatrixProperty, animator, HandoffBehavior.SnapshotAndReplace);
+            */
         }
-
 
         public List<Bitmap> ConvertPdfToImage()
         {
