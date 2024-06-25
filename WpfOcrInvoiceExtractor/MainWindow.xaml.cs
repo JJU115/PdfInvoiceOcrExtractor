@@ -11,8 +11,9 @@ using Tesseract;
 
 using Point = System.Windows.Point;
 using Size = System.Windows.Size;
-using Rect = System.Windows.Rect;
+using Rectangle = System.Windows.Shapes.Rectangle;
 using Brushes = System.Windows.Media.Brushes;
+using System.Windows.Ink;
 
 namespace WpfOcrInvoiceExtractor
 {
@@ -44,8 +45,8 @@ namespace WpfOcrInvoiceExtractor
                  IntPtr.Zero,
                  new Int32Rect(0, 0, oldBitmap.Width, oldBitmap.Height),
                  null);
-            invoice.Source = bitmapSource;    
-
+            invoice.Source = bitmapSource;
+            Canvas.SetZIndex(invoice, 100);
             this.Loaded += MainWindow_Loaded;
             this.KeyDown += OnKeyDownHandler;
             invoice.MouseWheel += image_MouseWheel;
@@ -216,28 +217,44 @@ namespace WpfOcrInvoiceExtractor
             Debug.WriteLine($"{matrix} -- {bottomRightSide.Y}");
         }
 
+        Point drawPointStart;
+        Rectangle currRect;
+
+        private void draw_rectangle(object sender, MouseEventArgs e)
+        {
+            Point mousePoint = e.GetPosition(imageCanvas);
+            Vector rectPoint = drawPointStart - mousePoint;
+            ScaleTransform direction = (ScaleTransform)currRect.RenderTransform;
+            direction.ScaleX = rectPoint.X < 0 ? 1 : -1;
+            direction.ScaleY = rectPoint.Y < 0 ? 1 : -1;
+            currRect.Width = Math.Abs(drawPointStart.X - mousePoint.X);
+            currRect.Height = Math.Abs(drawPointStart.Y - mousePoint.Y);
+        }
 
         private void image_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
         {
             //Also need to change the event handler for mouse move as long as the right mouse button is held down
-            Point startPoint = e.GetPosition(invoice);
+            drawPointStart = e.GetPosition(imageCanvas);
+            invoice.MouseMove -= image_MouseMove;
+            invoice.MouseMove += draw_rectangle;
 
-            Rect rect = new Rect();
-
-            Canvas.SetLeft(rect, startPoint.X);
-            Canvas.SetTop(rect, startPoint.Y);
-
-            imageControl.MouseMove += ImageControl_MouseMove;
-            imageControl.MouseUp += ImageControl_MouseUp;
-
-            // Add the rectangle to a canvas or grid that overlays the image
-            // Example assuming you have a Canvas named canvasOverlay:
-            canvasOverlay.Children.Add(rect);
+            currRect = new Rectangle();
+            currRect.RenderTransform = new ScaleTransform(1, 1);
+            currRect.Stroke = Brushes.Violet;
+            currRect.StrokeThickness = 2;
+            currRect.MouseRightButtonUp += image_MouseRightButtonUp;
+            Canvas.SetLeft(currRect, drawPointStart.X);
+            Canvas.SetTop(currRect, drawPointStart.Y);
+            Canvas.SetZIndex(currRect, 500);
+            Canvas.SetZIndex(invoice, 400);
+            imageCanvas.Children.Add(currRect);
         }
 
         private void image_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
         {
             //Finalize the rectangle on the canvas overlay and set the mouse move handler back to the panning handler
+            invoice.MouseMove += image_MouseMove;
+            invoice.MouseMove -= draw_rectangle;
         }
 
 
