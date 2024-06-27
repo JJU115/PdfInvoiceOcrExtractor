@@ -12,7 +12,9 @@ using Tesseract;
 using Point = System.Windows.Point;
 using Size = System.Windows.Size;
 using Rectangle = System.Windows.Shapes.Rectangle;
+using Rect = System.Windows.Rect;
 using Brushes = System.Windows.Media.Brushes;
+using Pen = System.Windows.Media.Pen;
 using System.Windows.Ink;
 
 namespace WpfOcrInvoiceExtractor
@@ -30,6 +32,7 @@ namespace WpfOcrInvoiceExtractor
         private bool disableDownPanning;
 
         private double baseScale;
+        private BitmapSource reset;
 
         public MainWindow()
         {
@@ -45,7 +48,9 @@ namespace WpfOcrInvoiceExtractor
                  IntPtr.Zero,
                  new Int32Rect(0, 0, oldBitmap.Width, oldBitmap.Height),
                  null);
+
             invoice.Source = bitmapSource;
+            this.reset = bitmapSource;
             Canvas.SetZIndex(invoice, 100);
             this.Loaded += MainWindow_Loaded;
             this.KeyDown += OnKeyDownHandler;
@@ -82,6 +87,7 @@ namespace WpfOcrInvoiceExtractor
         {
             if (e.Key == Key.R)
             {
+                invoice.Source = this.reset;
                 Matrix mtx = new Matrix((this.Height - 37) / invoice.RenderSize.Height, 0, 0, (this.Height - 37) / invoice.RenderSize.Height, 0, 0);
                 baseScale = mtx.M11;
                 invoice.RenderTransform = new MatrixTransform(mtx);
@@ -250,11 +256,43 @@ namespace WpfOcrInvoiceExtractor
             imageCanvas.Children.Add(currRect);
         }
 
+        //Following works but cuts most of the image
+        //Look into: Writeable bitmaps, https://learn.microsoft.com/en-us/dotnet/api/system.windows.media.imaging.writeablebitmap?view=windowsdesktop-8.0
+        //https://stackoverflow.com/questions/58259608/how-to-draw-a-rectangle-using-writeablebitmap?rq=3
+        //rendertargetbitmaps: https://learn.microsoft.com/en-us/dotnet/api/system.windows.media.imaging.rendertargetbitmap?view=windowsdesktop-8.0&redirectedfrom=MSDN
+        //Composing multiple bitmaps into one: https://stackoverflow.com/questions/30991309/create-a-composite-bitmapimage-in-wpf?noredirect=1&lq=1
         private void image_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
         {
+            BitmapSource image = CreateBitmap(
+            (int)invoice.RenderSize.Height, (int)invoice.RenderSize.Width, 300,
+            drawingContext =>
+            {
+                drawingContext.DrawImage(invoice.Source, new Rect(new Size(invoice.RenderSize.Height, invoice.RenderSize.Width)));
+                /*drawingContext.DrawRectangle(
+                    Brushes.Green, null, new Rect(50, 50, 200, 100));
+                drawingContext.DrawLine(
+                    new Pen(Brushes.White, 2), new Point(0, 0), new Point(320, 240));*/
+            });
+            
+            invoice.Source = image;
             //Finalize the rectangle on the canvas overlay and set the mouse move handler back to the panning handler
             invoice.MouseMove += image_MouseMove;
             invoice.MouseMove -= draw_rectangle;
+        }
+
+        public static BitmapSource CreateBitmap(
+    int width, int height, double dpi, Action<DrawingContext> render)
+        {
+            DrawingVisual drawingVisual = new DrawingVisual();
+            using (DrawingContext drawingContext = drawingVisual.RenderOpen())
+            {
+                render(drawingContext);
+            }
+            RenderTargetBitmap bitmap = new RenderTargetBitmap(
+                width, height, dpi, dpi, PixelFormats.Default);
+            bitmap.Render(drawingVisual);
+
+            return bitmap;
         }
 
 
