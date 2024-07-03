@@ -16,6 +16,7 @@ using Rect = System.Windows.Rect;
 using Brushes = System.Windows.Media.Brushes;
 using Pen = System.Windows.Media.Pen;
 using System.Windows.Ink;
+using System.Windows.Shapes;
 
 namespace WpfOcrInvoiceExtractor
 {
@@ -32,7 +33,6 @@ namespace WpfOcrInvoiceExtractor
         private bool disableDownPanning;
 
         private double baseScale;
-        private BitmapSource reset;
 
         public MainWindow()
         {
@@ -48,10 +48,11 @@ namespace WpfOcrInvoiceExtractor
                  IntPtr.Zero,
                  new Int32Rect(0, 0, oldBitmap.Width, oldBitmap.Height),
                  null);
+            var writeableBitmap = new WriteableBitmap(bitmapSource);
 
-            invoice.Source = bitmapSource;
-            this.reset = bitmapSource;
+            invoice.Source = writeableBitmap;
             Canvas.SetZIndex(invoice, 100);
+
             this.Loaded += MainWindow_Loaded;
             this.KeyDown += OnKeyDownHandler;
             invoice.MouseWheel += image_MouseWheel;
@@ -67,13 +68,6 @@ namespace WpfOcrInvoiceExtractor
             this.disableUpPanning = false;
         }
 
-        //Zooming out always re-centers image and doesn't allow space between top and bottom edges
-        //  - If no image edge is stuck, zoom out is from mouse position
-        //  - Any stuck edges stay stuck when zooming out (max 2) until certain scale reached
-        //  - Top and bottom edges always end up stuck to window edge, sides separate and always have equal width of image to window edge 
-        //Animating zoom in/out?
-        //Drawing rectangles on image
-        //Extracting rectangles as images into new windows
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
@@ -85,13 +79,11 @@ namespace WpfOcrInvoiceExtractor
 
         private void OnKeyDownHandler(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.R)
+            if (e.Key == Key.A && regions.Count > 0)
             {
-                invoice.Source = this.reset;
-                Matrix mtx = new Matrix((this.Height - 37) / invoice.RenderSize.Height, 0, 0, (this.Height - 37) / invoice.RenderSize.Height, 0, 0);
-                baseScale = mtx.M11;
-                invoice.RenderTransform = new MatrixTransform(mtx);
-                Canvas.SetLeft(invoice, (this.ActualWidth - (mtx.M11 * invoice.RenderSize.Width)) / 2);
+                CroppedBitmap cb = new CroppedBitmap((BitmapSource)invoice.Source, regions[0]);
+                RegionViewer rv = new RegionViewer(cb);
+                rv.Show();
             }
         }
 
@@ -224,7 +216,8 @@ namespace WpfOcrInvoiceExtractor
         }
 
         Point drawPointStart;
-        Rectangle currRect;
+        Rectangle currRect = new Rectangle();
+        List<Int32Rect> regions = new List<Int32Rect>();
 
         private void draw_rectangle(object sender, MouseEventArgs e)
         {
@@ -246,53 +239,62 @@ namespace WpfOcrInvoiceExtractor
 
             currRect = new Rectangle();
             currRect.RenderTransform = new ScaleTransform(1, 1);
-            currRect.Stroke = Brushes.Violet;
-            currRect.StrokeThickness = 2;
+            currRect.Stroke = Brushes.Purple;
+            currRect.StrokeThickness = 4;
+            currRect.Cursor = Cursors.ScrollAll;
             currRect.MouseRightButtonUp += image_MouseRightButtonUp;
             Canvas.SetLeft(currRect, drawPointStart.X);
             Canvas.SetTop(currRect, drawPointStart.Y);
             Canvas.SetZIndex(currRect, 500);
-            Canvas.SetZIndex(invoice, 400);
             imageCanvas.Children.Add(currRect);
         }
 
-        //Following works but cuts most of the image
-        //Look into: Writeable bitmaps, https://learn.microsoft.com/en-us/dotnet/api/system.windows.media.imaging.writeablebitmap?view=windowsdesktop-8.0
-        //https://stackoverflow.com/questions/58259608/how-to-draw-a-rectangle-using-writeablebitmap?rq=3
-        //rendertargetbitmaps: https://learn.microsoft.com/en-us/dotnet/api/system.windows.media.imaging.rendertargetbitmap?view=windowsdesktop-8.0&redirectedfrom=MSDN
-        //Composing multiple bitmaps into one: https://stackoverflow.com/questions/30991309/create-a-composite-bitmapimage-in-wpf?noredirect=1&lq=1
+
         private void image_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
         {
-            BitmapSource image = CreateBitmap(
-            (int)invoice.RenderSize.Height, (int)invoice.RenderSize.Width, 300,
-            drawingContext =>
-            {
-                drawingContext.DrawImage(invoice.Source, new Rect(new Size(invoice.RenderSize.Height, invoice.RenderSize.Width)));
-                /*drawingContext.DrawRectangle(
-                    Brushes.Green, null, new Rect(50, 50, 200, 100));
-                drawingContext.DrawLine(
-                    new Pen(Brushes.White, 2), new Point(0, 0), new Point(320, 240));*/
-            });
-            
-            invoice.Source = image;
-            //Finalize the rectangle on the canvas overlay and set the mouse move handler back to the panning handler
+            //Perform 4 writePixels calls, one for each side of the rectangle to draw
             invoice.MouseMove += image_MouseMove;
             invoice.MouseMove -= draw_rectangle;
-        }
 
-        public static BitmapSource CreateBitmap(
-    int width, int height, double dpi, Action<DrawingContext> render)
-        {
-            DrawingVisual drawingVisual = new DrawingVisual();
-            using (DrawingContext drawingContext = drawingVisual.RenderOpen())
+            var drawPointTopLeft = imageCanvas.TransformToDescendant(invoice).Transform(drawPointStart);
+            var drawPointBottomRight = imageCanvas.TransformToDescendant(invoice).Transform(new Point(drawPointStart.X + this.currRect.Width, drawPointStart.Y + this.currRect.Height));
+            var wb = ((WriteableBitmap)invoice.Source);
+
+            int bytesPerPixel = (wb.Format.BitsPerPixel + 7) / 8; // general formula
+            var width = (int)Math.Abs(drawPointBottomRight.X - drawPointTopLeft.X);
+            int height = (int)Math.Abs(drawPointBottomRight.Y - drawPointTopLeft.Y);
+            var topStride = width * bytesPerPixel;
+            var sideStride = 5 * bytesPerPixel;
+            int bufferLen = Math.Max(topStride * 5, sideStride * (height + 5));
+            byte[] topBuffer = new byte[bufferLen];
+            byte[] sideBuffer = new byte[bufferLen];
+            
+            for (int b=0; b < bufferLen; b+=bytesPerPixel)
             {
-                render(drawingContext);
+                topBuffer[b] = sideBuffer[b] = 40;        
+                topBuffer[b + 1] = sideBuffer[b + 1] = 232;  
+                topBuffer[b + 2] = sideBuffer[b + 2] = 72;    
+                topBuffer[b + 3] = sideBuffer[b + 3] = 0;
             }
-            RenderTargetBitmap bitmap = new RenderTargetBitmap(
-                width, height, dpi, dpi, PixelFormats.Default);
-            bitmap.Render(drawingVisual);
 
-            return bitmap;
+            //Draw top
+            var rect = new Int32Rect((int)drawPointTopLeft.X, (int)drawPointTopLeft.Y, width, 5);
+            wb.WritePixels(rect, topBuffer, topStride, 0);
+
+            //Draw right side
+            rect = new Int32Rect((int)drawPointTopLeft.X + width, (int)drawPointTopLeft.Y, 5, height + 5);
+            wb.WritePixels(rect, sideBuffer, sideStride, 0);
+
+            //Draw bottom
+            rect = new Int32Rect((int)drawPointTopLeft.X, (int)drawPointTopLeft.Y + height, width, 5);
+            wb.WritePixels(rect, topBuffer, topStride, 0);
+
+            //Draw left side
+            rect = new Int32Rect((int)drawPointTopLeft.X, (int)drawPointTopLeft.Y, 5, height);
+            wb.WritePixels(rect, sideBuffer, sideStride, 0);
+
+            imageCanvas.Children.RemoveAt(imageCanvas.Children.Count - 1);
+            regions.Add(new Int32Rect((int)drawPointTopLeft.X, (int)drawPointTopLeft.Y, width, height));
         }
 
 
