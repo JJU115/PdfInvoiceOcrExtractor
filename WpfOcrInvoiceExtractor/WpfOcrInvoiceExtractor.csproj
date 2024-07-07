@@ -10,6 +10,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="testimages\testcrop.jpg" />
+    <None Remove="testimages\wesco_invoice_date.jpg" />
+    <None Remove="testimages\wesco_invoice_invoice.jpg" />
+    <None Remove="testimages\wesco_invoice_logo.jpg" />
+    <None Remove="testimages\wesco_invoice_table.jpg" />
+    <None Remove="testimages\wesco_invoice_total.jpg" />
     <None Remove="wesco_264010700_20220521_23275357_9136520875-images-0.jpg" />
   </ItemGroup>
 
@@ -20,6 +26,24 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Resource Include="testimages\testcrop.jpg">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="testimages\wesco_invoice_date.jpg">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="testimages\wesco_invoice_invoice.jpg">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="testimages\wesco_invoice_logo.jpg">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="testimages\wesco_invoice_table.jpg">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="testimages\wesco_invoice_total.jpg">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Resource>
     <Resource Include="wesco_264010700_20220521_23275357_9136520875-images-0.jpg">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Resource>
@@ -29,7 +53,7 @@
     <None Update="tessdata\eng.traineddata">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="testImages\wesco_264010700_20220521_23275357_9136520875.pdf">
+    <None Update="testimages\wesco_264010700_20220521_23275357_9136520875.pdf">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>

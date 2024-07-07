@@ -75,14 +75,17 @@ namespace WpfOcrInvoiceExtractor
             baseScale = mtx.M11;
             invoice.RenderTransform = new MatrixTransform(mtx);
             Canvas.SetLeft(invoice, (this.ActualWidth - (mtx.M11 * invoice.RenderSize.Width)) / 2);
+            RegionViewer rv = new RegionViewer(this.regions.Select(R => new CroppedBitmap((BitmapSource)invoice.Source, R)).ToList());
+            rv.Show();
+            rv.Focus();
         }
 
         private void OnKeyDownHandler(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.A && regions.Count > 0)
+            if (e.Key == Key.A)
             {
-                CroppedBitmap cb = new CroppedBitmap((BitmapSource)invoice.Source, regions[0]);
-                RegionViewer rv = new RegionViewer(cb);
+                //CroppedBitmap cb = new CroppedBitmap((BitmapSource)invoice.Source, regions[0]);
+                RegionViewer rv = new RegionViewer(this.regions.Select(R => new CroppedBitmap((BitmapSource)invoice.Source, R)).ToList());
                 rv.Show();
             }
         }

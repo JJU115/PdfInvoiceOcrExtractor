@@ -5,21 +5,37 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:WpfOcrInvoiceExtractor"
         mc:Ignorable="d"
-        Title="RegionViewer" Width="40">
+        Title="RegionViewer" Width="40" d:DesignHeight="23.963">
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition />
-            <ColumnDefinition />
+            <ColumnDefinition/>
+            <ColumnDefinition/>
+            <ColumnDefinition/>
+            <ColumnDefinition/>
+            <ColumnDefinition/>
         </Grid.ColumnDefinitions>
 
         <!--The region viewer -->
-        <Canvas Grid.Column="0">
-            
+        <Canvas Name="spotlightCanvas"  Grid.Column="0" Grid.ColumnSpan="3" Background="Black">
+            <Image x:Name="spotlightRegion" RenderOptions.BitmapScalingMode="HighQuality" Cursor="ScrollAll"></Image>
         </Canvas>
 
-        <!-- Miniaturized versions of each defined region arranged in a grid -->
-        <WrapPanel Grid.Column="1">
+        <ScrollViewer Grid.Column="3" Grid.ColumnSpan="2" Background="Beige">
+            <ItemsControl Name="regionList">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
 
-        </WrapPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Image Source="{Binding}" Height="75" Width="75" Margin="5,0,5,0"></Image>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+        
+
     </Grid>
 </Window>
