@@ -1,18 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
+﻿using System.Diagnostics;
+using System.Drawing;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
+using Tesseract;
 
 namespace WpfOcrInvoiceExtractor
 {
@@ -22,35 +17,72 @@ namespace WpfOcrInvoiceExtractor
     /// </summary>
     public partial class RegionViewer : Window
     {
-        List<BitmapSource> imageSources = new List<BitmapSource>();
+        List<ImageRegion> imageSources = new List<ImageRegion>();
+        int focusedRegion;
+
         public RegionViewer(List<CroppedBitmap> regions)
         {
             InitializeComponent();
             this.Loaded += Window_Loaded;
+            
             this.Width = SystemParameters.PrimaryScreenWidth / 2;
             this.Height = SystemParameters.PrimaryScreenHeight;
 
             string sourceDirectory = @"C:\Users\Justin\source\repos\WpfOcrInvoiceExtractor\WpfOcrInvoiceExtractor\testimages";
             var txtFiles = Directory.EnumerateFiles(sourceDirectory).Where(f => f.EndsWith("jpg"));
 
-            foreach (string currentFile in txtFiles)
+            for (var i=0; i<txtFiles.Count(); i++)
             {
-                string f = currentFile.Replace("\\", "/");
-                Uri uri = new Uri(f, UriKind.RelativeOrAbsolute);
-                BitmapImage img = new BitmapImage(uri);
-                img.DecodePixelWidth = 75;
-                imageSources.Add(img);
+                string f = txtFiles.ElementAt(i).Replace("\\", "/");
+                imageSources.Add(new ImageRegion(f, i));
             }
 
             regionList.ItemsSource = imageSources;
-            spotlightRegion.Source = imageSources[0];
-
+            spotlightRegion.Source = imageSources[0].Image;
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             Matrix mtx = new Matrix(spotlightCanvas.RenderSize.Width / spotlightRegion.RenderSize.Width, 0, 0, spotlightCanvas.RenderSize.Width / spotlightRegion.RenderSize.Width, 0, 0);
+            Canvas.SetTop(spotlightRegion, (spotlightCanvas.RenderSize.Height - (mtx.M22 * spotlightRegion.RenderSize.Height)) / 2);
             spotlightRegion.RenderTransform = new MatrixTransform(mtx);
+            this.SizeChanged += Window_Resize;
+        }
+
+        private void Window_Resize(object sender, RoutedEventArgs e)
+        {
+            MatrixTransform matrixTransform = (MatrixTransform)spotlightRegion.RenderTransform;
+            var matrix = matrixTransform.Matrix;
+            matrix.M11 = matrix.M22 = spotlightCanvas.RenderSize.Width / spotlightRegion.Source.Width;
+            matrixTransform.Matrix = matrix;
+            Canvas.SetTop(spotlightRegion, (spotlightCanvas.RenderSize.Height - (matrix.M22 * spotlightRegion.Source.Height)) / 2);
+        }
+
+        private void regionClicked(object sender, MouseButtonEventArgs e) {
+            // Get the index of the clicked image - sender.content.index
+            ImageRegion rgn = (ImageRegion)((ContentPresenter) sender).Content;
+            this.focusedRegion = rgn.index;
+            spotlightRegion.Source = imageSources[rgn.index].Image;
+            MatrixTransform matrixTransform = (MatrixTransform) spotlightRegion.RenderTransform;
+            var matrix = matrixTransform.Matrix;
+            matrix.M11 = matrix.M22 = spotlightCanvas.RenderSize.Width / imageSources[rgn.index].Image.Width;
+            matrixTransform.Matrix = matrix;            
+            Canvas.SetTop(spotlightRegion, (spotlightCanvas.RenderSize.Height - (matrix.M22 * imageSources[rgn.index].Image.Height)) / 2);
+        }
+
+        private void runOCRTestOnCurrent(object sender, RoutedEventArgs e)
+        {
+            TesseractEngine engine = new TesseractEngine("./tessdata", "eng");
+            using (MemoryStream outStream = new())
+            {
+                BitmapEncoder enc = new BmpBitmapEncoder();
+                enc.Frames.Add(BitmapFrame.Create(this.imageSources[this.focusedRegion].Image));
+                enc.Save(outStream);
+                Bitmap bitmap = new(outStream);
+
+                var page = engine.Process(new Bitmap(bitmap));
+                Debug.WriteLine($"{page.GetText()}");
+            }
         }
     }
 }

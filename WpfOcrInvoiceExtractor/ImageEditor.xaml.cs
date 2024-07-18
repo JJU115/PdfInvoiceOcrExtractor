@@ -1,27 +1,27 @@
-﻿using System.Diagnostics;
-using System.Drawing;
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using Ghostscript.NET.Rasterizer;
-using Tesseract;
+using System.Windows.Navigation;
+using System.Windows.Shapes;
 
-using Point = System.Windows.Point;
-using Size = System.Windows.Size;
-using Rectangle = System.Windows.Shapes.Rectangle;
-using Brushes = System.Windows.Media.Brushes;
-//654.54.54  Height
-//640 Width
 namespace WpfOcrInvoiceExtractor
 {
     /// <summary>
-    /// Interaction logic for MainWindow.xaml
+    /// Interaction logic for ImageEditor.xaml
     /// </summary>
-    public partial class MainWindow : Window
+    public partial class ImageEditor : UserControl
     {
+        public WriteableBitmap ImageBitmap { get; set; }
 
         private Point origin;
         private Point start;
@@ -31,50 +31,38 @@ namespace WpfOcrInvoiceExtractor
         private bool disableDownPanning;
         private double baseScale;
 
-        public MainWindow()
+        public ImageEditor()
         {
             InitializeComponent();
-            this.Width = SystemParameters.PrimaryScreenWidth / 2;
-            this.Height = SystemParameters.PrimaryScreenHeight / 1.1;
-            var oldBitmap = ConvertPdfToImage()[0];
-
-            var hOldBitmap = oldBitmap.GetHbitmap(System.Drawing.Color.Transparent);
-            var bitmapSource =
-               Imaging.CreateBitmapSourceFromHBitmap(
-                 hOldBitmap,
-                 IntPtr.Zero,
-                 new Int32Rect(0, 0, oldBitmap.Width, oldBitmap.Height),
-                 null);
-
-            //this.Loaded += Window_Loaded;
-
-            /*invoice.MouseWheel += image_MouseWheel;
+            
+            this.Loaded += Control_Loaded;
+            
+            invoice.MouseWheel += image_MouseWheel;
             invoice.MouseLeftButtonDown += image_MouseLeftButtonDown;
             invoice.MouseRightButtonDown += image_MouseRightButtonDown;
             invoice.MouseRightButtonUp += image_MouseRightButtonUp;
             invoice.MouseLeftButtonUp += image_MouseLeftButtonUp;
-            invoice.MouseMove += image_MouseMove;*/
+            invoice.MouseMove += image_MouseMove;
 
             this.disableRightPanning = false;
             this.disableDownPanning = false;
             this.disableLeftPanning = false;
             this.disableUpPanning = false;
-            //ImageEditorControl.invoice.Source = new WriteableBitmap(bitmapSource);
-            ImageEditorControl.ImageBitmap = new WriteableBitmap(bitmapSource);
-            //invoice.Source = new WriteableBitmap(bitmapSource);
         }
-        /*
-        private void Window_Loaded(object sender, RoutedEventArgs e)
+
+
+        private void Control_Loaded(object sender, RoutedEventArgs e)
         {
-            
+            invoice.Source = ImageBitmap;
             Canvas.SetZIndex(invoice, 100);
-            Matrix mtx = new Matrix((this.Height - 38) / invoice.RenderSize.Height, 0, 0, (this.Height - 38) / invoice.RenderSize.Height, 0, 0);
+            Matrix mtx = new Matrix(this.ActualHeight / ImageBitmap.Height, 0, 0, this.ActualHeight / ImageBitmap.Height, 0, 0);
             baseScale = mtx.M11;
             invoice.RenderTransform = new MatrixTransform(mtx);
-            Canvas.SetLeft(invoice, (this.ActualWidth - (mtx.M11 * invoice.RenderSize.Width)) / 2);
-            RegionViewer rv = new RegionViewer(this.regions.Select(R => new CroppedBitmap((BitmapSource)invoice.Source, R)).ToList());
+            Canvas.SetLeft(invoice, (this.ActualWidth - (mtx.M11 * ImageBitmap.Width)) / 2);
+            //RegionViewer rv = new RegionViewer(this.regions.Select(R => new CroppedBitmap((BitmapSource)invoice.Source, R)).ToList());
             this.SizeChanged += Window_Resize;
         }
+
 
         private void Window_Resize(object sender, RoutedEventArgs e)
         {
@@ -352,36 +340,6 @@ namespace WpfOcrInvoiceExtractor
             }
             matrixTransform.Matrix = matrix;
         }
-        */
-        public List<Bitmap> ConvertPdfToImage()
-        {
-            int desired_dpi = 300;
 
-            string inputPdfPath = @"testImages\wesco_264010700_20220521_23275357_9136520875.pdf";
-            string outputPath = @"C:\Users\Justin\Pictures";
-
-            List<Bitmap> pdfImages = new List<Bitmap>();
-            using (var rasterizer = new GhostscriptRasterizer())
-            {
-                rasterizer.Open(inputPdfPath);
-
-                for (var pageNumber = 1; pageNumber <= rasterizer.PageCount; pageNumber++)
-                {
-                    var pageFilePath = System.IO.Path.Combine(outputPath, string.Format("Page-{0}.png", pageNumber));
-
-                    var img = rasterizer.GetPage(desired_dpi, pageNumber);
-                    pdfImages.Add(new Bitmap(img));
-                }
-            }
-            return pdfImages;
-        }
-
-
-        public string runTesseract(Bitmap img)
-        {
-            TesseractEngine engine = new TesseractEngine("./tessdata", "eng");
-            var page = engine.Process(img);
-            return page.GetText();
-        }
     }
 }

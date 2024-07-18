@@ -17,6 +17,11 @@
 
         <!--The region viewer -->
         <Canvas Name="spotlightCanvas"  Grid.Column="0" Grid.ColumnSpan="3" Background="Black">
+            <StackPanel Orientation="Horizontal">
+                <Button Click="runOCRTestOnCurrent">OCR Test</Button>
+                <Button>Save</Button>
+                <Button>Delete</Button>
+            </StackPanel>
             <Image x:Name="spotlightRegion" RenderOptions.BitmapScalingMode="HighQuality" Cursor="ScrollAll"></Image>
         </Canvas>
 
@@ -30,9 +35,14 @@
 
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Image Source="{Binding}" Height="75" Width="75" Margin="5,0,5,0"></Image>
+                        <Image Source="{Binding Image}" Height="100" Width="100" Margin="5,0,5,0"></Image>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
+                <ItemsControl.ItemContainerStyle>
+                    <Style>
+                        <EventSetter Event="Image.MouseDown" Handler="regionClicked"/>
+                    </Style>
+                </ItemsControl.ItemContainerStyle>
             </ItemsControl>
         </ScrollViewer>
         
