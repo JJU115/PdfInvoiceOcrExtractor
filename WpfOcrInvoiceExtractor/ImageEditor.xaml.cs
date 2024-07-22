@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -23,6 +24,10 @@ namespace WpfOcrInvoiceExtractor
     {
         public WriteableBitmap ImageBitmap { get; set; }
 
+        public List<Int32Rect> RegionsSource = new List<Int32Rect>();
+
+        public string ScalingMode { get; set; }
+
         private Point origin;
         private Point start;
         private bool disableRightPanning;
@@ -31,10 +36,12 @@ namespace WpfOcrInvoiceExtractor
         private bool disableDownPanning;
         private double baseScale;
 
+        Point drawPointStart;
+        Rectangle currRect = new Rectangle();
+
         public ImageEditor()
         {
             InitializeComponent();
-            
             this.Loaded += Control_Loaded;
             
             invoice.MouseWheel += image_MouseWheel;
@@ -55,23 +62,36 @@ namespace WpfOcrInvoiceExtractor
         {
             invoice.Source = ImageBitmap;
             Canvas.SetZIndex(invoice, 100);
+            if (this.ScalingMode == "Vertical") this.Initialize_Vertical_Setup();
+            else this.Initialize_Horizontal_Setup();
+            this.SizeChanged += Window_Resize;
+        }
+
+
+        public void Initialize_Vertical_Setup()
+        {
             Matrix mtx = new Matrix(this.ActualHeight / ImageBitmap.Height, 0, 0, this.ActualHeight / ImageBitmap.Height, 0, 0);
             baseScale = mtx.M11;
             invoice.RenderTransform = new MatrixTransform(mtx);
             Canvas.SetLeft(invoice, (this.ActualWidth - (mtx.M11 * ImageBitmap.Width)) / 2);
-            //RegionViewer rv = new RegionViewer(this.regions.Select(R => new CroppedBitmap((BitmapSource)invoice.Source, R)).ToList());
-            this.SizeChanged += Window_Resize;
         }
 
+        public void Initialize_Horizontal_Setup()
+        {
+            Matrix mtx = new Matrix(this.ActualWidth / ImageBitmap.Width, 0, 0, this.ActualWidth / ImageBitmap.Width, 0, 0);
+            baseScale = mtx.M11;
+            invoice.RenderTransform = new MatrixTransform(mtx);
+            Canvas.SetTop(invoice, (this.ActualHeight - (mtx.M22 * this.ActualHeight)) / 2);
+        }
 
         private void Window_Resize(object sender, RoutedEventArgs e)
         {
             MatrixTransform matrixTransform = (MatrixTransform)invoice.RenderTransform;
             var matrix = matrixTransform.Matrix;
-            matrix.M11 = matrix.M22 = (this.Height - 38) / invoice.RenderSize.Height;
+            matrix.M11 = matrix.M22 = this.ActualHeight / ImageBitmap.Height;
             baseScale = matrix.M11;
             matrixTransform.Matrix = matrix;
-            Canvas.SetLeft(invoice, (this.ActualWidth - (matrix.M11 * invoice.RenderSize.Width)) / 2);
+            Canvas.SetLeft(invoice, (this.ActualWidth - (matrix.M11 * ImageBitmap.Width)) / 2);
         }
 
         private void image_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -83,8 +103,8 @@ namespace WpfOcrInvoiceExtractor
         {
             if (!invoice.IsMouseCaptured) return;
 
-            bool ignoreHTrans = false;
-            bool ignoreVTrans = false;
+            bool ignoreHTrans;
+            bool ignoreVTrans;
 
             var ta = invoice.TransformToAncestor(imageCanvas);
             Point areaPosition = ta.Transform(new Point(0, 0));
@@ -127,7 +147,6 @@ namespace WpfOcrInvoiceExtractor
             //If the translation is left to right...
             if (v.X < 0)
             {
-                //if (this.disableRightPanning) return;
                 hTranslation = this.disableRightPanning ? offsetX : hTranslation;
                 //If the translation has moved the left edge of the image past the left edge of the window...
                 if (topLeftSide.X + (hTranslation - offsetX) >= 0)
@@ -141,7 +160,6 @@ namespace WpfOcrInvoiceExtractor
 
             if (v.X > 0) //Right to left translation
             {
-                //if (this.disableLeftPanning) return;
                 hTranslation = this.disableLeftPanning ? offsetX : hTranslation;
                 //If the translation has moved the right edge of the image past the right edge of the window...
                 if (bottomRightSide.X + (offsetX - hTranslation) >= 0)
@@ -156,7 +174,6 @@ namespace WpfOcrInvoiceExtractor
             //Downwards translation
             if (v.Y < 0)
             {
-                //if (this.disableDownPanning) return;
                 vTranslation = this.disableDownPanning ? offsetY : vTranslation;
                 //If the translation has moved the top edge of the image past the top edge of the window...
                 if (topLeftSide.Y + (vTranslation - offsetY) >= 0)
@@ -170,7 +187,6 @@ namespace WpfOcrInvoiceExtractor
 
             if (v.Y > 0) //Upwards translation
             {
-                //if (this.disableUpPanning) return;
                 vTranslation = this.disableUpPanning ? offsetY : vTranslation;
                 //If the translation has moved the bottom edge of the image past the bottom edge of the window...
                 if (bottomRightSide.Y + (offsetY - vTranslation) >= 0)
@@ -202,9 +218,7 @@ namespace WpfOcrInvoiceExtractor
             Debug.WriteLine($"{matrix} -- {bottomRightSide.Y}");
         }
 
-        Point drawPointStart;
-        Rectangle currRect = new Rectangle();
-        List<Int32Rect> regions = new List<Int32Rect>();
+        
 
         private void draw_rectangle(object sender, MouseEventArgs e)
         {
@@ -243,13 +257,16 @@ namespace WpfOcrInvoiceExtractor
             invoice.MouseMove += image_MouseMove;
             invoice.MouseMove -= draw_rectangle;
 
-            var drawPointTopLeft = imageCanvas.TransformToDescendant(invoice).Transform(drawPointStart);
-            var drawPointBottomRight = imageCanvas.TransformToDescendant(invoice).Transform(new Point(drawPointStart.X + this.currRect.Width, drawPointStart.Y + this.currRect.Height));
+            double scaleX = ((ScaleTransform)currRect.RenderTransform).ScaleX;
+            double scaleY = ((ScaleTransform)currRect.RenderTransform).ScaleY;
+            var drawPointTopLeft = imageCanvas.TransformToDescendant(invoice).Transform(new Point(drawPointStart.X - (scaleX == -1 ? this.currRect.Width : 0), drawPointStart.Y - (scaleY == -1 ? this.currRect.Height : 0)));
+            var drawPointBottomRight = imageCanvas.TransformToDescendant(invoice).Transform(new Point(drawPointStart.X + (scaleX == 1 ? this.currRect.Width : 0), drawPointStart.Y + (scaleY == 1 ? this.currRect.Height : 0)));
             var wb = ((WriteableBitmap)invoice.Source);
 
+            //Need checks if rect goes off image edge
             int bytesPerPixel = (wb.Format.BitsPerPixel + 7) / 8; // general formula
-            var width = (int)Math.Abs(drawPointBottomRight.X - drawPointTopLeft.X);
-            int height = (int)Math.Abs(drawPointBottomRight.Y - drawPointTopLeft.Y);
+            var width = (int)(drawPointBottomRight.X - drawPointTopLeft.X);
+            int height = (int)(drawPointBottomRight.Y - drawPointTopLeft.Y);
             var topStride = width * bytesPerPixel;
             var sideStride = 5 * bytesPerPixel;
             int bufferLen = Math.Max(topStride * 5, sideStride * (height + 5));
@@ -281,7 +298,7 @@ namespace WpfOcrInvoiceExtractor
             wb.WritePixels(rect, sideBuffer, sideStride, 0);
 
             imageCanvas.Children.RemoveAt(imageCanvas.Children.Count - 1);
-            regions.Add(new Int32Rect((int)drawPointTopLeft.X, (int)drawPointTopLeft.Y, width, height));
+            RegionsSource.Add(new Int32Rect((int)drawPointTopLeft.X, (int)drawPointTopLeft.Y, width, height));
         }
 
 

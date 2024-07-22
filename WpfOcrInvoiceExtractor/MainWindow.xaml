@@ -8,7 +8,7 @@
         mc:Ignorable="d"
         Title="MainWindow"  Left="0" Top="0" d:DesignHeight="264.697" d:DesignWidth="270.281">
     <Grid>
-        <uc:ImageEditor x:Name="ImageEditorControl"></uc:ImageEditor>
+        <uc:ImageEditor x:Name="ImageEditorControl" ScalingMode="Vertical"></uc:ImageEditor>
     </Grid>
 
 </Window>
