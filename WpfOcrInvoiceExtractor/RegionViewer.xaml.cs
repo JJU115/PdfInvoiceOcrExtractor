@@ -18,12 +18,12 @@ namespace WpfOcrInvoiceExtractor
     public partial class RegionViewer : Window
     {
         List<ImageRegion> imageSources = new List<ImageRegion>();
-        WriteableBitmap focusedRegion;
+        int focusedRegion;
 
         public RegionViewer(List<CroppedBitmap> regions)
         {
             InitializeComponent();
-            
+            this.DataContext = this;
             this.Width = SystemParameters.PrimaryScreenWidth / 2;
             this.Height = SystemParameters.PrimaryScreenHeight;
 
@@ -37,20 +37,14 @@ namespace WpfOcrInvoiceExtractor
             }
 
             regionList.ItemsSource = imageSources;
-            focusedRegion = new WriteableBitmap(imageSources[0].Image);
-            //ImageEditorControl.ImageBitmap = new WriteableBitmap(imageSources[0].Image);
+            ImageEditorControl.ImageBitmap = new WriteableBitmap(imageSources[0].Image);
+            focusedRegion = 0;
         }
 
         private void regionClicked(object sender, MouseButtonEventArgs e) {
             // Get the index of the clicked image - sender.content.index
             ImageRegion rgn = (ImageRegion)((ContentPresenter) sender).Content;
-            this.focusedRegion = new WriteableBitmap(imageSources[rgn.index].Image);
-            //ImageEditorControl.ImageBitmap = new WriteableBitmap(imageSources[rgn.index].Image);
-            /*MatrixTransform matrixTransform = (MatrixTransform) spotlightRegion.RenderTransform;
-            var matrix = matrixTransform.Matrix;
-            matrix.M11 = matrix.M22 = spotlightCanvas.RenderSize.Width / imageSources[rgn.index].Image.Width;
-            matrixTransform.Matrix = matrix;            
-            Canvas.SetTop(spotlightRegion, (spotlightCanvas.RenderSize.Height - (matrix.M22 * imageSources[rgn.index].Image.Height)) / 2);*/
+            ImageEditorControl.Invoice_SourceUpdated(new WriteableBitmap(imageSources[rgn.index].Image));
         }
 
         private void runOCRTestOnCurrent(object sender, RoutedEventArgs e)
@@ -59,7 +53,7 @@ namespace WpfOcrInvoiceExtractor
             using (MemoryStream outStream = new())
             {
                 BitmapEncoder enc = new BmpBitmapEncoder();
-                enc.Frames.Add(BitmapFrame.Create(this.focusedRegion));
+                enc.Frames.Add(BitmapFrame.Create(this.imageSources[this.focusedRegion].Image));
                 enc.Save(outStream);
                 Bitmap bitmap = new(outStream);
 

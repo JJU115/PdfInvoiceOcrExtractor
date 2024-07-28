@@ -18,13 +18,16 @@
 
         <!--The region viewer -->
         
-        <Canvas Name="spotlightCanvas"  Grid.Column="0" Grid.ColumnSpan="3" Background="Black">
+        <Canvas Name="spotlightCanvas"  Grid.Column="0" Grid.ColumnSpan="3">
             <StackPanel Orientation="Horizontal">
                 <Button Click="runOCRTestOnCurrent">OCR Test</Button>
                 <Button>Save</Button>
                 <Button>Delete</Button>
             </StackPanel>
-            <uc:ImageEditor x:Name="ImageEditorControl" ImageBitmap="{Binding focusedRegion}" ScalingMode="Horizontal" Grid.Column="0" Grid.ColumnSpan="3"></uc:ImageEditor>
+            <DockPanel Grid.Column="0" Grid.ColumnSpan="3" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Margin="0,0,0,0" Canvas.Left="0" Canvas.Top="0" 
+            Width="{Binding ActualWidth, ElementName=spotlightCanvas}" Height="{Binding ActualHeight, ElementName=spotlightCanvas}">
+                <uc:ImageEditor x:Name="ImageEditorControl" ScalingMode="Horizontal" Drawable="False"></uc:ImageEditor>
+            </DockPanel>
         </Canvas>
 
         <ScrollViewer Grid.Column="3" Grid.ColumnSpan="2" Background="Beige">

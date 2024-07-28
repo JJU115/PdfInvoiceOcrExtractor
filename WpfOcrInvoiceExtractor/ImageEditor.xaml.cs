@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
@@ -22,11 +24,12 @@ namespace WpfOcrInvoiceExtractor
     /// </summary>
     public partial class ImageEditor : UserControl
     {
+
         public WriteableBitmap ImageBitmap { get; set; }
 
         public List<Int32Rect> RegionsSource = new List<Int32Rect>();
-
         public string ScalingMode { get; set; }
+        public bool Drawable { get; set; }
 
         private Point origin;
         private Point start;
@@ -46,8 +49,11 @@ namespace WpfOcrInvoiceExtractor
             
             invoice.MouseWheel += image_MouseWheel;
             invoice.MouseLeftButtonDown += image_MouseLeftButtonDown;
-            invoice.MouseRightButtonDown += image_MouseRightButtonDown;
-            invoice.MouseRightButtonUp += image_MouseRightButtonUp;
+            if (this.Drawable)
+            {
+                invoice.MouseRightButtonDown += image_MouseRightButtonDown;
+                invoice.MouseRightButtonUp += image_MouseRightButtonUp;
+            }
             invoice.MouseLeftButtonUp += image_MouseLeftButtonUp;
             invoice.MouseMove += image_MouseMove;
 
@@ -57,6 +63,14 @@ namespace WpfOcrInvoiceExtractor
             this.disableUpPanning = false;
         }
 
+        public void Invoice_SourceUpdated(WriteableBitmap wb)
+        {
+            invoice.Source = wb;
+            Matrix mtx = new Matrix(this.ActualWidth / wb.Width, 0, 0, this.ActualWidth / wb.Width, 0, 0);
+            baseScale = mtx.M11;
+            invoice.RenderTransform = new MatrixTransform(mtx);
+            Canvas.SetTop(invoice, (this.ActualHeight - (mtx.M22 * wb.Height)) / 2);
+        }
 
         private void Control_Loaded(object sender, RoutedEventArgs e)
         {
@@ -81,17 +95,45 @@ namespace WpfOcrInvoiceExtractor
             Matrix mtx = new Matrix(this.ActualWidth / ImageBitmap.Width, 0, 0, this.ActualWidth / ImageBitmap.Width, 0, 0);
             baseScale = mtx.M11;
             invoice.RenderTransform = new MatrixTransform(mtx);
-            Canvas.SetTop(invoice, (this.ActualHeight - (mtx.M22 * this.ActualHeight)) / 2);
+            Canvas.SetTop(invoice, (this.ActualHeight - (mtx.M22 * ImageBitmap.Height)) / 2);
         }
 
         private void Window_Resize(object sender, RoutedEventArgs e)
         {
             MatrixTransform matrixTransform = (MatrixTransform)invoice.RenderTransform;
             var matrix = matrixTransform.Matrix;
-            matrix.M11 = matrix.M22 = this.ActualHeight / ImageBitmap.Height;
-            baseScale = matrix.M11;
-            matrixTransform.Matrix = matrix;
-            Canvas.SetLeft(invoice, (this.ActualWidth - (matrix.M11 * ImageBitmap.Width)) / 2);
+            if (matrix.M11 == this.baseScale)
+            {
+                if (this.ScalingMode == "Vertical")
+                {
+                    matrix.M11 = matrix.M22 = this.ActualHeight / ImageBitmap.Height;
+                    Canvas.SetLeft(invoice, (this.ActualWidth - (matrix.M11 * ImageBitmap.Width)) / 2);
+                }
+                else
+                {
+                    matrix.M11 = matrix.M22 = this.ActualWidth / ImageBitmap.Width;                    
+                    Canvas.SetTop(invoice, (this.ActualHeight - (matrix.M22 * ImageBitmap.Height)) / 2);
+                }
+                baseScale = matrix.M11;
+                matrixTransform.Matrix = matrix;
+            } 
+            else
+            {
+                if (this.ScalingMode == "Vertical")
+                {
+                    //Basic idea here is correct but only works if height is adjusted, need to handle if width changes
+                    var scaleFactor = matrix.M11 / baseScale;
+                    var newBaseScale = this.ActualHeight / ImageBitmap.Height;
+                    baseScale = newBaseScale;
+                    matrix.M11 = matrix.M22 = scaleFactor * newBaseScale;
+                } 
+                else
+                {
+                    //matrix.M11 = matrix.M22 = this.ActualWidth / invoice.RenderSize.Width;
+                }
+                matrixTransform.Matrix = matrix;
+            }
+            
         }
 
         private void image_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
