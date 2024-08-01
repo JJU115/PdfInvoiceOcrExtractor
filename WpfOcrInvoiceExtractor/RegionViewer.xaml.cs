@@ -17,6 +17,7 @@ namespace WpfOcrInvoiceExtractor
     /// </summary>
     public partial class RegionViewer : Window
     {
+        TesseractEngine engine = new TesseractEngine("./tessdata", "eng");
         List<ImageRegion> imageSources = new List<ImageRegion>();
         int focusedRegion;
 
@@ -39,17 +40,21 @@ namespace WpfOcrInvoiceExtractor
             regionList.ItemsSource = imageSources;
             ImageEditorControl.ImageBitmap = new WriteableBitmap(imageSources[0].Image);
             focusedRegion = 0;
+            ((RegionDataTemplateSelector)this.Resources["RegionDataTemplateSelector"]).SelectedIndex = 0;
         }
 
         private void regionClicked(object sender, MouseButtonEventArgs e) {
             // Get the index of the clicked image - sender.content.index
             ImageRegion rgn = (ImageRegion)((ContentPresenter) sender).Content;
+            var selector = new RegionDataTemplateSelector();
+            selector.SelectedIndex = rgn.index;
+            regionList.ItemTemplateSelector = selector;
             ImageEditorControl.Invoice_SourceUpdated(new WriteableBitmap(imageSources[rgn.index].Image));
+            this.focusedRegion = rgn.index;
         }
 
         private void runOCRTestOnCurrent(object sender, RoutedEventArgs e)
         {
-            TesseractEngine engine = new TesseractEngine("./tessdata", "eng");
             using (MemoryStream outStream = new())
             {
                 BitmapEncoder enc = new BmpBitmapEncoder();
@@ -59,7 +64,32 @@ namespace WpfOcrInvoiceExtractor
 
                 var page = engine.Process(new Bitmap(bitmap));
                 Debug.WriteLine($"{page.GetText()}");
+                page.Dispose();
             }
+        }
+    }
+
+    public class RegionDataTemplateSelector : DataTemplateSelector
+    {
+        public int SelectedIndex { get; set; }
+
+        public override DataTemplate SelectTemplate(object item, DependencyObject container)
+        {
+            FrameworkElement element = container as FrameworkElement;
+
+            if (element != null && item != null && item is ImageRegion)
+            {
+                ImageRegion region = item as ImageRegion;
+
+                if (region.index == SelectedIndex)
+                    return
+                        element.FindResource("selectedRegion") as DataTemplate;
+                else
+                    return
+                        element.FindResource("standardRegion") as DataTemplate;
+            }
+
+            return null;
         }
     }
 }

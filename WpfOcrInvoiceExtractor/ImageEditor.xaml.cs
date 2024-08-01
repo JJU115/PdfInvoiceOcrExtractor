@@ -65,7 +65,7 @@ namespace WpfOcrInvoiceExtractor
 
         public void Invoice_SourceUpdated(WriteableBitmap wb)
         {
-            invoice.Source = wb;
+            invoice.Source = this.ImageBitmap = wb;
             Matrix mtx = new Matrix(this.ActualWidth / wb.Width, 0, 0, this.ActualWidth / wb.Width, 0, 0);
             baseScale = mtx.M11;
             invoice.RenderTransform = new MatrixTransform(mtx);
@@ -112,7 +112,7 @@ namespace WpfOcrInvoiceExtractor
                 else
                 {
                     matrix.M11 = matrix.M22 = this.ActualWidth / ImageBitmap.Width;                    
-                    Canvas.SetTop(invoice, (this.ActualHeight - (matrix.M22 * ImageBitmap.Height)) / 2);
+                    Canvas.SetTop(invoice, (this.ActualHeight - (matrix.M11 * ImageBitmap.Height)) / 2);
                 }
                 baseScale = matrix.M11;
                 matrixTransform.Matrix = matrix;

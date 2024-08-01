@@ -7,6 +7,25 @@
         xmlns:local="clr-namespace:WpfOcrInvoiceExtractor"
         mc:Ignorable="d"
         Title="RegionViewer" Width="40" d:DesignHeight="23.963">
+    <Window.Resources>
+        <local:RegionDataTemplateSelector x:Key="RegionDataTemplateSelector"/>
+        <DataTemplate x:Key="selectedRegion">
+            <Border Background="Gray" BorderBrush="Purple" BorderThickness="3" Margin="15,15,15,15">
+                <StackPanel Orientation="Vertical">
+                    <Image Source="{Binding Image}" Height="100" Width="100"></Image>
+                    <TextBlock FontSize="14" FontWeight="Bold" FontStyle="Italic">Name</TextBlock>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+        <DataTemplate x:Key="standardRegion">
+            <Border Background="Gray" BorderBrush="GhostWhite" BorderThickness="3" Margin="15,15,15,15">
+                <StackPanel Orientation="Vertical">
+                    <Image Source="{Binding Image}" Height="100" Width="100"></Image>
+                    <TextBlock FontSize="14" FontWeight="Bold" FontStyle="Italic">Name</TextBlock>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </Window.Resources>
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition/>
@@ -17,32 +36,35 @@
         </Grid.ColumnDefinitions>
 
         <!--The region viewer -->
-        
-        <Canvas Name="spotlightCanvas"  Grid.Column="0" Grid.ColumnSpan="3">
-            <StackPanel Orientation="Horizontal">
+
+        <!--Canvas Name="spotlightCanvas" Background="BlanchedAlmond"  Grid.Column="0" Grid.ColumnSpan="3"-->
+        <Grid Name="spotlightCanvas" Grid.ColumnSpan="3">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <StackPanel Orientation="Horizontal" Grid.Row="0">
                 <Button Click="runOCRTestOnCurrent">OCR Test</Button>
-                <Button>Save</Button>
                 <Button>Delete</Button>
             </StackPanel>
-            <DockPanel Grid.Column="0" Grid.ColumnSpan="3" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Margin="0,0,0,0" Canvas.Left="0" Canvas.Top="0" 
-            Width="{Binding ActualWidth, ElementName=spotlightCanvas}" Height="{Binding ActualHeight, ElementName=spotlightCanvas}">
-                <uc:ImageEditor x:Name="ImageEditorControl" ScalingMode="Horizontal" Drawable="False"></uc:ImageEditor>
-            </DockPanel>
-        </Canvas>
+            <uc:ImageEditor x:Name="ImageEditorControl" ScalingMode="Horizontal" Drawable="False" Grid.Row="1"></uc:ImageEditor>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,0" Grid.Row="2">
+                <TextBox>Region Label</TextBox>
+                <Button>Edit Label</Button>
+                <Button>Save</Button>
+                <Button>Mark as Table</Button>
+            </StackPanel>
+        </Grid>
 
         <ScrollViewer Grid.Column="3" Grid.ColumnSpan="2" Background="Beige">
-            <ItemsControl Name="regionList">
+            <ItemsControl Name="regionList" ItemTemplateSelector="{StaticResource RegionDataTemplateSelector}">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
                         <WrapPanel />
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
 
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Image Source="{Binding Image}" Height="100" Width="100" Margin="5,0,5,0"></Image>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
                 <ItemsControl.ItemContainerStyle>
                     <Style>
                         <EventSetter Event="Image.MouseDown" Handler="regionClicked"/>
