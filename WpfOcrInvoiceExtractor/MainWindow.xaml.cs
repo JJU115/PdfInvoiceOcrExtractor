@@ -8,11 +8,14 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Ghostscript.NET.Rasterizer;
 using Tesseract;
+using Microsoft.Web.WebView2.Core;
+using Intuit.Ipp.OAuth2PlatformClient;
 
 using Point = System.Windows.Point;
 using Size = System.Windows.Size;
 using Rectangle = System.Windows.Shapes.Rectangle;
 using Brushes = System.Windows.Media.Brushes;
+using Microsoft.Web.WebView2.WinForms;
 //654.54.54  Height
 //640 Width
 namespace WpfOcrInvoiceExtractor

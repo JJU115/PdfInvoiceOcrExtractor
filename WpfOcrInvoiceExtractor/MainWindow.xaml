@@ -5,10 +5,12 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:WpfOcrInvoiceExtractor"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         mc:Ignorable="d"
         Title="MainWindow"  Left="0" Top="0" d:DesignHeight="264.697" d:DesignWidth="270.281">
     <Grid>
         <uc:ImageEditor x:Name="ImageEditorControl" ScalingMode="Vertical" Drawable="True"></uc:ImageEditor>
+        <wv2:WebView2 x:Name="WebView" />
     </Grid>
 
 </Window>
