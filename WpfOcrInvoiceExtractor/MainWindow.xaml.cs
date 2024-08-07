@@ -52,10 +52,15 @@ namespace WpfOcrInvoiceExtractor
 
         private void MainWindow_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.R) {
+            if (e.Key == Key.R)
+            {
                 //ImageEditorControl.RegionsSource - To get rectangles
                 RegionViewer rv = new RegionViewer(new List<CroppedBitmap>());
                 rv.Show();
+            }
+            else if (e.Key == Key.F) { 
+                QBOAuthWindow authWindow = new QBOAuthWindow();
+                authWindow.Show();
             }
         }
 

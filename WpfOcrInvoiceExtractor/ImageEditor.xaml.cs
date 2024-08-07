@@ -48,12 +48,7 @@ namespace WpfOcrInvoiceExtractor
             this.Loaded += Control_Loaded;
             
             invoice.MouseWheel += image_MouseWheel;
-            invoice.MouseLeftButtonDown += image_MouseLeftButtonDown;
-            if (this.Drawable)
-            {
-                invoice.MouseRightButtonDown += image_MouseRightButtonDown;
-                invoice.MouseRightButtonUp += image_MouseRightButtonUp;
-            }
+            invoice.MouseLeftButtonDown += image_MouseLeftButtonDown;           
             invoice.MouseLeftButtonUp += image_MouseLeftButtonUp;
             invoice.MouseMove += image_MouseMove;
 
@@ -78,6 +73,11 @@ namespace WpfOcrInvoiceExtractor
             Canvas.SetZIndex(invoice, 100);
             if (this.ScalingMode == "Vertical") this.Initialize_Vertical_Setup();
             else this.Initialize_Horizontal_Setup();
+            if (this.Drawable)
+            {
+                invoice.MouseRightButtonDown += image_MouseRightButtonDown;
+                invoice.MouseRightButtonUp += image_MouseRightButtonUp;
+            }
             this.SizeChanged += Window_Resize;
         }
 

@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:WpfOcrInvoiceExtractor"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         mc:Ignorable="d"
-        Title="QBOAuthWindow" Height="250" Width="300">
+        Title="QBOAuthWindow" Height="800" Width="500">
     <Grid>
         <wv2:WebView2 Name="WebView" />
     </Grid>
