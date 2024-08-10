@@ -10,13 +10,36 @@ using System.IO;
 using System.Text.Json;
 using System.Collections.Specialized;
 using System.Web;
+using Intuit.Ipp.Data;
+using System.Security.Claims;
+using Intuit.Ipp.Security;
+using Intuit.Ipp.QueryFilter;
+using System.Net.Http;
+using System.IdentityModel.Tokens.Jwt;
+using Task = System.Threading.Tasks.Task;
+using System.Diagnostics;
 
 namespace WpfOcrInvoiceExtractor
 {
     class QBOUtility
     {
+        /* Refresh request
+         * POST /oauth2/v1/tokens/bearer?grant_type
+    =refresh_token&refresh_token
+    =AB11731906050GY9gy8BWAGA9IUel94ZThM8
+    jI2FpH4Rsmcxkh
+Content-Type: application/x-www-form
+    -urlencoded
+Accept: application/json
+Authorization: Basic 
+    QUJDbU54MzVTWk9ZRW9jTHBFRG9GamtsOVc3M
+    W9qY2xMbWs1VUVhUTk2OU9DN1VSUVI6NTBuRk
+    pRVUdIVDFSSVRtN2JFMW9VaTFmM2JqN3RDQ0t
+    1MmdXbFYySQ==
+         */
         public static QboAuthTokens? Tokens { get; set; } = null;
         public static OAuth2Client? Client { get; set; } = null;
+        private static HttpClient? StaticClient = null;
 
         public static void Initialize(string path = ".\\Tokens.json")
         {
@@ -44,6 +67,51 @@ namespace WpfOcrInvoiceExtractor
             }
         }
 
+        public static bool CreateNewBillToQbo()
+        {
+            //Create bill object
+            Bill bill = new Bill();
+
+            //Check the tokens
+            Task<bool> authTask = new Task<bool>(() => { return true; });
+            Task task = Task.Run(() =>
+            {
+                bool accessValid = Tokens != null && CheckTokenIsValid(Tokens.AccessToken ?? "");
+                bool refreshValid = Tokens != null && CheckTokenIsValid(Tokens.RefreshToken ?? "");
+                if (!accessValid && !refreshValid)
+                {
+                    //Alter authTask
+                    QBOAuthWindow authWindow = new QBOAuthWindow();
+                    authWindow.Closed += (s, a) => authTask.Start();
+                    authWindow.Show();
+                } else if (!accessValid) {
+                    //Alter auth task
+                    //Refresh token request
+                    authTask.Start();
+                }
+            });
+
+            task.Wait();
+            authTask.Wait();
+
+            if (!authTask.Result) return false;
+
+            //Prepare the request
+            if (StaticClient == null) StaticClient = new HttpClient();
+
+            //Set the body and headers
+
+            //Receive and parse the response
+
+            /*
+             * POST /v3/company/9341452801840587/bill?minorversion=73
+
+Content type:application/json
+Production Base URL:https://quickbooks.api.intuit.com
+Sandbox Base URL:https://sandbox-quickbooks.api.intuit.com
+             */
+            return true;
+        }
 
         public static string GetAuthorizationURL(params OidcScopes[] scopes)
         {
@@ -53,7 +121,7 @@ namespace WpfOcrInvoiceExtractor
             {
                 Initialize();
             }
-
+            
             return Client.GetAuthorizationURL(scopes.ToList());
         }
 
@@ -122,6 +190,28 @@ namespace WpfOcrInvoiceExtractor
 
             // Write the string to the path.
             File.WriteAllText(path, serialized);
+        }
+
+
+        public static long GetTokenExpirationTime(string token)
+        {
+            var handler = new JwtSecurityTokenHandler();
+            var jwtSecurityToken = handler.ReadJwtToken(token);
+            var tokenExp = jwtSecurityToken.Claims.First(claim => claim.Type.Equals("exp")).Value;
+            var ticks = long.Parse(tokenExp);
+            return ticks;
+        }
+
+        public static bool CheckTokenIsValid(string token)
+        {
+            var tokenTicks = GetTokenExpirationTime(token);
+            var tokenDate = DateTimeOffset.FromUnixTimeSeconds(tokenTicks).UtcDateTime;
+
+            var now = DateTime.Now.ToUniversalTime();
+
+            var valid = tokenDate >= now;
+
+            return valid;
         }
     }
 }
