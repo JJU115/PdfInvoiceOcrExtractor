@@ -9,7 +9,9 @@ namespace WpfOcrInvoiceExtractor
     internal class QboAuthTokens
     {
         public string? AccessToken { get; set; }
+        public DateTime? AccessTokenExpiresIn { get; set; }
         public string? RefreshToken { get; set; }
+        public DateTime? RefreshTokenExpiresIn { get; set; }
         public string? RealmId { get; set; }
         public string? ClientId { get; set; }
         public string? ClientSecret { get; set; }

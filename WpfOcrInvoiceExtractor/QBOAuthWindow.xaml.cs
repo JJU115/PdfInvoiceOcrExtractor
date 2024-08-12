@@ -25,11 +25,12 @@ namespace WpfOcrInvoiceExtractor
     public partial class QBOAuthWindow : Window
     {
         private bool userAuthComplete = false;
+        public string webviewSourceQuery = "";
+
         public QBOAuthWindow()
         {
             InitializeComponent();
-            this.Loaded += Window_Loaded;
-            this.Closing += Window_Closing;
+            this.Loaded += Window_Loaded;           
         }
 
 
@@ -50,7 +51,11 @@ namespace WpfOcrInvoiceExtractor
 
         private void CoreWebView2_NavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
         {
-            if (userAuthComplete) this.Close();
+            if (userAuthComplete)
+            {
+                this.webviewSourceQuery = WebView.Source.Query;
+                this.Close();
+            }
         }
 
         private void CoreWebView2_NavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs e)
@@ -61,29 +66,6 @@ namespace WpfOcrInvoiceExtractor
             {
                 Debug.WriteLine("QBO Redirect detected");
                 this.userAuthComplete = true;
-            }
-        }
-
-        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
-        {
-            // When the user closes the form we
-            // assume that the operation has
-            // completed with success or failure.
-
-            // Get the current query parameters
-            // from the current WebView source (page)
-            string query = WebView.Source.Query;
-
-            // Use the the shared helper library
-            // to validate the query parameters
-            // and write the output file.
-            if (QBOUtility.CheckQueryParamsAndSet(query) == true && QBOUtility.Tokens != null)
-            {
-                QBOUtility.WriteTokensAsJson(QBOUtility.Tokens);
-            }
-            else
-            {
-                MessageBox.Show("Quickbooks Online failed to authenticate.");
             }
         }
     }

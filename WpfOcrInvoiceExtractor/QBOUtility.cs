@@ -18,25 +18,16 @@ using System.Net.Http;
 using System.IdentityModel.Tokens.Jwt;
 using Task = System.Threading.Tasks.Task;
 using System.Diagnostics;
+using System.Net.Http.Json;
+using System.Collections;
+using System.Windows;
 
 namespace WpfOcrInvoiceExtractor
 {
+    
     class QBOUtility
     {
-        /* Refresh request
-         * POST /oauth2/v1/tokens/bearer?grant_type
-    =refresh_token&refresh_token
-    =AB11731906050GY9gy8BWAGA9IUel94ZThM8
-    jI2FpH4Rsmcxkh
-Content-Type: application/x-www-form
-    -urlencoded
-Accept: application/json
-Authorization: Basic 
-    QUJDbU54MzVTWk9ZRW9jTHBFRG9GamtsOVc3M
-    W9qY2xMbWs1VUVhUTk2OU9DN1VSUVI6NTBuRk
-    pRVUdIVDFSSVRtN2JFMW9VaTFmM2JqN3RDQ0t
-    1MmdXbFYySQ==
-         */
+        readonly static string BASE_URL = "https://sandbox.api.intuit.com/quickbooks";
         public static QboAuthTokens? Tokens { get; set; } = null;
         public static OAuth2Client? Client { get; set; } = null;
         private static HttpClient? StaticClient = null;
@@ -67,49 +58,64 @@ Authorization: Basic
             }
         }
 
-        public static bool CreateNewBillToQbo()
+        public static async Task<bool> CheckTokens()
         {
-            //Create bill object
-            Bill bill = new Bill();
+            bool accessValid = Tokens != null && Tokens.AccessTokenExpiresIn > DateTime.Now;
+            bool refreshValid = Tokens != null && Tokens.RefreshTokenExpiresIn > DateTime.Now;
 
-            //Check the tokens
-            Task<bool> authTask = new Task<bool>(() => { return true; });
-            Task task = Task.Run(() =>
+            QBOAuthWindow authWindow = new();
+            Task<bool> authFinished = new(() =>
             {
-                bool accessValid = Tokens != null && CheckTokenIsValid(Tokens.AccessToken ?? "");
-                bool refreshValid = Tokens != null && CheckTokenIsValid(Tokens.RefreshToken ?? "");
-                if (!accessValid && !refreshValid)
+                if (CheckQueryParamsAndSet(authWindow.webviewSourceQuery) == true && Tokens != null)
                 {
-                    //Alter authTask
-                    QBOAuthWindow authWindow = new QBOAuthWindow();
-                    authWindow.Closed += (s, a) => authTask.Start();
-                    authWindow.Show();
-                } else if (!accessValid) {
-                    //Alter auth task
-                    //Refresh token request
-                    authTask.Start();
+                    WriteTokensAsJson(Tokens);
+                    return true;
+                }
+                else
+                {
+                    MessageBox.Show("Quickbooks Online failed to authenticate.");
+                    return false;
                 }
             });
 
-            task.Wait();
-            authTask.Wait();
+            if (!accessValid && !refreshValid)
+            {
+                authWindow.Closed += (s, a) => authFinished.Start();
+                authWindow.Show();
+                await authFinished;
+                return authFinished.Result;
+            }
+            else if (!accessValid)
+            {
+                var response = await Client!.RefreshTokenAsync("refreshToken");
+                return response.HttpStatusCode == System.Net.HttpStatusCode.OK;
+            }
+            else
+            {
+                return true;
+            }
+        }
 
-            if (!authTask.Result) return false;
+        public static async Task<bool> CreateNewBillToQbo()
+        {
+            //Check the tokens, if authentication failed for any reason, end and return false
+            if (!await CheckTokens()) return false;
+            //Otherwise we are now fully authorized to make requests
 
             //Prepare the request
             if (StaticClient == null) StaticClient = new HttpClient();
 
             //Set the body and headers
+            string url = $"{BASE_URL}/v3/company/{Tokens!.RealmId}/bill?minorversion=73";
+            StaticClient.SetBearerToken(Tokens.AccessToken);
+
+            Bill bill = new Bill();
+            bill.VendorRef = new ReferenceType();
+            bill.VendorRef.Value = "56";
 
             //Receive and parse the response
-
-            /*
-             * POST /v3/company/9341452801840587/bill?minorversion=73
-
-Content type:application/json
-Production Base URL:https://quickbooks.api.intuit.com
-Sandbox Base URL:https://sandbox-quickbooks.api.intuit.com
-             */
+            HttpResponseMessage response = await StaticClient.PostAsJsonAsync(url, bill);
+            Debug.WriteLine($"{response.Content}");
             return true;
         }
 
@@ -140,12 +146,14 @@ Sandbox Base URL:https://sandbox-quickbooks.api.intuit.com
 
                 // Use the OAuth2Client to get a new
                 // access token from the QBO servers.
-                TokenResponse response = Client.GetBearerTokenAsync(query["code"]).Result;
+                TokenResponse response = Client!.GetBearerTokenAsync(query["code"]).Result;
 
                 // Set the token values with the client
-                // responce and query parameters.
-                Tokens.AccessToken = response.AccessToken;
+                // response and query parameters.
+                Tokens!.AccessToken = response.AccessToken;
+                Tokens.AccessTokenExpiresIn = DateTime.Now.AddSeconds(response.AccessTokenExpiresIn);
                 Tokens.RefreshToken = response.RefreshToken;
+                Tokens.RefreshTokenExpiresIn = DateTime.Now.AddSeconds(response.RefreshTokenExpiresIn);
                 Tokens.RealmId = query["realmId"];
 
                 // Return true. The Tokens have
@@ -204,14 +212,18 @@ Sandbox Base URL:https://sandbox-quickbooks.api.intuit.com
 
         public static bool CheckTokenIsValid(string token)
         {
-            var tokenTicks = GetTokenExpirationTime(token);
-            var tokenDate = DateTimeOffset.FromUnixTimeSeconds(tokenTicks).UtcDateTime;
+            try
+            {
+                var tokenTicks = GetTokenExpirationTime(token);
+                var tokenDate = DateTimeOffset.FromUnixTimeSeconds(tokenTicks).UtcDateTime;
 
-            var now = DateTime.Now.ToUniversalTime();
+                var now = DateTime.Now.ToUniversalTime();
 
-            var valid = tokenDate >= now;
+                var valid = tokenDate >= now;
 
-            return valid;
+                return valid;
+            } catch { return false; }
+            
         }
     }
 }
