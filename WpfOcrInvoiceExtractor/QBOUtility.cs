@@ -27,7 +27,7 @@ namespace WpfOcrInvoiceExtractor
     
     class QBOUtility
     {
-        readonly static string BASE_URL = "https://sandbox.api.intuit.com/quickbooks";
+        readonly static string BASE_URL = "https://sandbox-quickbooks.api.intuit.com";
         public static QboAuthTokens? Tokens { get; set; } = null;
         public static OAuth2Client? Client { get; set; } = null;
         private static HttpClient? StaticClient = null;
@@ -110,8 +110,25 @@ namespace WpfOcrInvoiceExtractor
             StaticClient.SetBearerToken(Tokens.AccessToken);
 
             Bill bill = new Bill();
+            AccountBasedExpenseLineDetail abeld = new()
+            {
+                AccountRef = new ReferenceType()
+            };
+            abeld.AccountRef.Value = "7";
             bill.VendorRef = new ReferenceType();
             bill.VendorRef.Value = "56";
+            bill.Line = new Line[1];
+            bill.Line[0] = new Line
+            {
+                DetailType = LineDetailTypeEnum.AccountBasedExpenseLineDetail,
+                DetailTypeSpecified = true,
+                Amount = 200
+            };
+            bill.Line[0].AnyIntuitObject = abeld;
+
+            string url2 = $"{BASE_URL}/v3/company/9341452801840587/customer/2?minorversion=73";
+            HttpResponseMessage comp = await StaticClient.GetAsync(url2);
+            Debug.WriteLine($"{await comp.Content.ReadAsStreamAsync()}");
 
             //Receive and parse the response
             HttpResponseMessage response = await StaticClient.PostAsJsonAsync(url, bill);
