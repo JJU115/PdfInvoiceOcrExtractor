@@ -1,26 +1,14 @@
-﻿using Intuit.Ipp.Core;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Web.WebView2.Core;
-using Intuit.Ipp.OAuth2PlatformClient;
+﻿using Intuit.Ipp.OAuth2PlatformClient;
 using System.IO;
 using System.Text.Json;
 using System.Collections.Specialized;
 using System.Web;
-using Intuit.Ipp.Data;
-using System.Security.Claims;
-using Intuit.Ipp.Security;
-using Intuit.Ipp.QueryFilter;
 using System.Net.Http;
 using System.IdentityModel.Tokens.Jwt;
-using Task = System.Threading.Tasks.Task;
 using System.Diagnostics;
-using System.Net.Http.Json;
-using System.Collections;
 using System.Windows;
+using Newtonsoft.Json.Converters;
+using Newtonsoft.Json;
 
 namespace WpfOcrInvoiceExtractor
 {
@@ -37,10 +25,7 @@ namespace WpfOcrInvoiceExtractor
             // Loading the tokens and client once (on sign-in/start up)
             // and saving them in static properties saves us from
             // deserializing again when we want to read or write the data.
-            Tokens = JsonSerializer.Deserialize<QboAuthTokens>(File.ReadAllText(path), new JsonSerializerOptions()
-            {
-                ReadCommentHandling = JsonCommentHandling.Skip
-            }) ?? new();
+            if (Tokens == null) ReadTokensFromJson();
 
             // In the case that the data failed to deserialize, the ClientId
             // and ClientSecret will be null, we need to make sure that's
@@ -60,6 +45,8 @@ namespace WpfOcrInvoiceExtractor
 
         public static async Task<bool> CheckTokens()
         {
+            if (Tokens == null) ReadTokensFromJson();
+
             bool accessValid = Tokens != null && Tokens.AccessTokenExpiresIn > DateTime.Now;
             bool refreshValid = Tokens != null && Tokens.RefreshTokenExpiresIn > DateTime.Now;
 
@@ -87,8 +74,15 @@ namespace WpfOcrInvoiceExtractor
             }
             else if (!accessValid)
             {
-                var response = await Client!.RefreshTokenAsync("refreshToken");
-                return response.HttpStatusCode == System.Net.HttpStatusCode.OK;
+                Client ??= new(Tokens.ClientId, Tokens.ClientSecret, Tokens.RedirectUrl, Tokens.Environment);
+                TokenResponse response = await Client.RefreshTokenAsync(Tokens.RefreshToken);
+                if (!response.IsError)
+                {
+                    Tokens.AccessToken = response.AccessToken;
+                    Tokens.RefreshToken = response.RefreshToken;
+                    return true;
+                }
+                return false;
             }
             else
             {
@@ -109,30 +103,53 @@ namespace WpfOcrInvoiceExtractor
             string url = $"{BASE_URL}/v3/company/{Tokens!.RealmId}/bill?minorversion=73";
             StaticClient.SetBearerToken(Tokens.AccessToken);
 
-            Bill bill = new Bill();
-            AccountBasedExpenseLineDetail abeld = new()
+            /* Sample object, Have to query for all ref values, some can be hardcoded lists
+             * {
+                  "Line": [
+                    {
+                        "Description": "Lumber", 
+                        "DetailType": "AccountBasedExpenseLineDetail", 
+                        "ProjectRef": {
+                          "value": "39298034"
+                        }, 
+                        "Amount": 103.55, 
+                        "Id": "1", 
+                        "AccountBasedExpenseLineDetail": {
+                          "TaxCodeRef": {"value": "TAX"}, 
+                          "AccountRef": {"name": "Job Expenses:Job Materials:Decks and Patios", "value": "64"}, 
+                          "CustomerRef": {"name": "Travis Waldron", "value": "26"},
+                          "ClassRef": {"name": "className, "value": 0}
+                        }
+                      }
+                  ], 
+                  "VendorRef": {
+                    "value": "56"
+                  }
+                }
+             */
+
+            var billObject = new
             {
-                AccountRef = new ReferenceType()
+                Line = new[] {
+                new {DetailType = "AccountBasedExpenseLineDetail", Amount = 768.33, Id = "1", AccountBasedExpenseLineDetail = new {AccountRef = new {value = "7"}}}},
+                VendorRef = new { value = "41" }
             };
-            abeld.AccountRef.Value = "7";
-            bill.VendorRef = new ReferenceType();
-            bill.VendorRef.Value = "56";
-            bill.Line = new Line[1];
-            bill.Line[0] = new Line
-            {
-                DetailType = LineDetailTypeEnum.AccountBasedExpenseLineDetail,
-                DetailTypeSpecified = true,
-                Amount = 200
-            };
-            bill.Line[0].AnyIntuitObject = abeld;
+
+
+            var billObjectJson = JsonConvert.SerializeObject(billObject);
+
+            HttpRequestMessage requestMessage = new HttpRequestMessage(HttpMethod.Post, url);
+            requestMessage.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("bearer", Tokens.AccessToken);
+            requestMessage.Content = new StringContent(billObjectJson.ToString());
+            requestMessage.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
 
             string url2 = $"{BASE_URL}/v3/company/9341452801840587/customer/2?minorversion=73";
             HttpResponseMessage comp = await StaticClient.GetAsync(url2);
-            Debug.WriteLine($"{await comp.Content.ReadAsStreamAsync()}");
+            Debug.WriteLine($"{await comp.Content.ReadAsStringAsync()}");
 
             //Receive and parse the response
-            HttpResponseMessage response = await StaticClient.PostAsJsonAsync(url, bill);
-            Debug.WriteLine($"{response.Content}");
+            HttpResponseMessage response = await StaticClient.SendAsync(requestMessage);
+            Debug.WriteLine($"{await response.Content.ReadAsStringAsync()}");
             return true;
         }
 
@@ -196,6 +213,28 @@ namespace WpfOcrInvoiceExtractor
             }
         }
 
+        public static void ReadTokensFromJson()
+        {
+            FileInfo fi = new FileInfo(".\\Tokens.json");
+            if (fi.Exists)
+            {
+                Tokens = JsonConvert.DeserializeObject<QboAuthTokens>(File.ReadAllText(".\\Tokens.json"), new JsonSerializerSettings
+                {
+                    Error = (object sender, Newtonsoft.Json.Serialization.ErrorEventArgs args) =>
+                    {
+                        args.ErrorContext.Handled = true;
+                    },
+                    Converters = { new IsoDateTimeConverter() }
+                }
+                    );
+            }
+            else
+            {
+                File.Create(".\\Tokens.json");
+                Tokens = new();
+            }
+        }
+
         /// <summary>
         /// Serializes the static tokens instance (Local.Tokens) and writes the serialized string to the <paramref name="path"/>.
         /// </summary>
@@ -204,7 +243,7 @@ namespace WpfOcrInvoiceExtractor
         {
             // Serialize the passed object
             // to a JSON formatted string.
-            string serialized = JsonSerializer.Serialize(authTokens, new JsonSerializerOptions()
+            string serialized = System.Text.Json.JsonSerializer.Serialize(authTokens, new JsonSerializerOptions()
             {
                 WriteIndented = true,
             });
