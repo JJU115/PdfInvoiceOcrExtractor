@@ -85,13 +85,5 @@ namespace WpfOcrInvoiceExtractor
             }
             return pdfImages;
         }
-
-
-        public string runTesseract(Bitmap img)
-        {
-            TesseractEngine engine = new TesseractEngine("./tessdata", "eng");
-            var page = engine.Process(img);
-            return page.GetText();
-        }
     }
 }

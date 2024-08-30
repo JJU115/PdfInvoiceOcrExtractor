@@ -47,10 +47,10 @@ namespace WpfOcrInvoiceExtractor
             // Get the index of the clicked image - sender.content.index
             ImageRegion rgn = (ImageRegion)((ContentPresenter) sender).Content;
             var selector = new RegionDataTemplateSelector();
-            selector.SelectedIndex = rgn.index;
+            selector.SelectedIndex = rgn.Index;
             regionList.ItemTemplateSelector = selector;
-            ImageEditorControl.Invoice_SourceUpdated(new WriteableBitmap(imageSources[rgn.index].Image));
-            this.focusedRegion = rgn.index;
+            ImageEditorControl.Invoice_SourceUpdated(new WriteableBitmap(imageSources[rgn.Index].Image));
+            this.focusedRegion = rgn.Index;
         }
 
         private void runOCRTestOnCurrent(object sender, RoutedEventArgs e)
@@ -81,7 +81,7 @@ namespace WpfOcrInvoiceExtractor
             {
                 ImageRegion region = item as ImageRegion;
 
-                if (region.index == SelectedIndex)
+                if (region.Index == SelectedIndex)
                     return
                         element.FindResource("selectedRegion") as DataTemplate;
                 else

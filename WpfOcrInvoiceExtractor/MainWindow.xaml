@@ -10,7 +10,6 @@
         Title="MainWindow"  Left="0" Top="0" d:DesignHeight="264.697" d:DesignWidth="270.281">
     <Grid>
         <uc:ImageEditor x:Name="ImageEditorControl" ScalingMode="Vertical" Drawable="True"></uc:ImageEditor>
-        <wv2:WebView2 x:Name="WebView" />
     </Grid>
 
 </Window>

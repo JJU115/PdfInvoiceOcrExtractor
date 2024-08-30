@@ -9,6 +9,10 @@ using System.Diagnostics;
 using System.Windows;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json;
+using Tesseract;
+using System.Drawing;
+using System.Windows.Media.Imaging;
+using Intuit.Ipp.Data;
 
 namespace WpfOcrInvoiceExtractor
 {
@@ -19,6 +23,8 @@ namespace WpfOcrInvoiceExtractor
         public static QboAuthTokens? Tokens { get; set; } = null;
         public static OAuth2Client? Client { get; set; } = null;
         private static HttpClient? StaticClient = null;
+
+        public static TesseractEngine engine = new TesseractEngine("./tessdata", "eng");
 
         public static void Initialize(string path = ".\\Tokens.json")
         {
@@ -89,6 +95,29 @@ namespace WpfOcrInvoiceExtractor
                 return true;
             }
         }
+
+        public static Bill ResolveOnImageRegions(List<ImageRegion> imageRegions)
+        {
+            Bill bill = new Bill();
+
+            foreach (ImageRegion region in imageRegions)
+            {
+                
+                Pix pix = PixConverter.ToPix(new Bitmap(region.Image.StreamSource));
+                Page page = engine.Process(pix);
+                Debug.WriteLine($"{page.GetText()}");
+
+                switch (region.BillTopic)
+                {
+                    case BillTopic.Amount:
+                        bill.TotalAmt = Convert.ToDecimal(page.GetText());
+                        break;
+                }
+            }
+
+            return bill;
+        }
+
 
         public static async Task<bool> CreateNewBillToQbo()
         {
