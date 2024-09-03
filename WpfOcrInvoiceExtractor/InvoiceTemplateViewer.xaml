@@ -1,14 +1,13 @@
-﻿<Window x:Class="WpfOcrInvoiceExtractor.MainWindow"
+﻿<Window x:Class="WpfOcrInvoiceExtractor.InvoiceTemplateViewer"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:uc="clr-namespace:WpfOcrInvoiceExtractor"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:WpfOcrInvoiceExtractor"
-        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         mc:Ignorable="d"
-        Title="MainWindow"  Left="0" Top="0" d:DesignHeight="264.697" d:DesignWidth="270.281">
+        Title="InvoiceTemplateViewer" Height="450" Width="800">
     <Grid>
-
+        <uc:ImageEditor x:Name="ImageEditorControl" ScalingMode="Vertical" Drawable="True"></uc:ImageEditor>
     </Grid>
-
 </Window>

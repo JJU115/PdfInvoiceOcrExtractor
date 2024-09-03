@@ -14,7 +14,7 @@ namespace WpfOcrInvoiceExtractor
         Vendor
     }
 
-    internal class ImageRegion
+    public class ImageRegion
     {
         public BitmapImage Image { get; set; }
         public string Name { get; set; }

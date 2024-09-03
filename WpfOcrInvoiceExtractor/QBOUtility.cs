@@ -98,11 +98,15 @@ namespace WpfOcrInvoiceExtractor
 
         public static Bill ResolveOnImageRegions(List<ImageRegion> imageRegions)
         {
-            Bill bill = new Bill();
+            Bill bill = new()
+            {
+                Line = new Line[1]
+            };
+            bill.Line[0].DetailType = LineDetailTypeEnum.AccountBasedExpenseLineDetail;
+            AccountBasedExpenseLineDetail lineDetail = new AccountBasedExpenseLineDetail();
 
             foreach (ImageRegion region in imageRegions)
-            {
-                
+            {               
                 Pix pix = PixConverter.ToPix(new Bitmap(region.Image.StreamSource));
                 Page page = engine.Process(pix);
                 Debug.WriteLine($"{page.GetText()}");
@@ -110,16 +114,38 @@ namespace WpfOcrInvoiceExtractor
                 switch (region.BillTopic)
                 {
                     case BillTopic.Amount:
-                        bill.TotalAmt = Convert.ToDecimal(page.GetText());
+                        bill.Line[0].Amount = Convert.ToDecimal(page.GetText()); //Remove all non numeric characters
+                        break;
+                    case BillTopic.BillDate:
+                        bill.TxnDate = DateTime.Parse(page.GetText()); //Different possible date formats...
+                        break;
+                    case BillTopic.BillNumber:
+                        bill.DocNumber = page.GetText(); //Remove all non numeric characters
+                        break;
+                    case BillTopic.Category:       
+                        lineDetail.AccountRef = new ReferenceType();
+                        break;
+                    case BillTopic.Class:
+                        lineDetail.ClassRef = new ReferenceType();
+                        break;
+                    case BillTopic.Description:
+                        bill.Line[0].Description = "Default description";
+                        break;
+                    case BillTopic.SalesTax:    
+                        lineDetail.TaxCodeRef = new ReferenceType();
+                        break;
+                    case BillTopic.Vendor:
+                        bill.VendorRef = new ReferenceType();
                         break;
                 }
-            }
 
+                page.Dispose();
+            }
+            bill.Line[0].AnyIntuitObject = lineDetail;
             return bill;
         }
 
-
-        public static async Task<bool> CreateNewBillToQbo()
+        public static async Task<bool> CreateNewBillToQbo(List<ImageRegion> imageRegions, Vendor vendor)
         {
             //Check the tokens, if authentication failed for any reason, end and return false
             if (!await CheckTokens()) return false;
@@ -157,11 +183,13 @@ namespace WpfOcrInvoiceExtractor
                 }
              */
 
+            Bill billToSend = ResolveOnImageRegions(imageRegions);
+
             var billObject = new
             {
                 Line = new[] {
                 new {DetailType = "AccountBasedExpenseLineDetail", Amount = 768.33, Id = "1", AccountBasedExpenseLineDetail = new {AccountRef = new {value = "7"}}}},
-                VendorRef = new { value = "41" }
+                VendorRef = new { value = vendor.Id, name = vendor.DisplayName }
             };
 
 

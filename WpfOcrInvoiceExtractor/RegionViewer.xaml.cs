@@ -21,21 +21,12 @@ namespace WpfOcrInvoiceExtractor
         List<ImageRegion> imageSources = new List<ImageRegion>();
         int focusedRegion;
 
-        public RegionViewer(List<CroppedBitmap> regions)
+        public RegionViewer(List<ImageRegion> regions)
         {
             InitializeComponent();
             this.DataContext = this;
             this.Width = SystemParameters.PrimaryScreenWidth / 2;
             this.Height = SystemParameters.PrimaryScreenHeight;
-
-            string sourceDirectory = @"C:\Users\Justin\source\repos\WpfOcrInvoiceExtractor\WpfOcrInvoiceExtractor\testimages";
-            var txtFiles = Directory.EnumerateFiles(sourceDirectory).Where(f => f.EndsWith("jpg"));
-
-            for (var i=0; i<txtFiles.Count(); i++)
-            {
-                string f = txtFiles.ElementAt(i).Replace("\\", "/");
-                imageSources.Add(new ImageRegion(f, i));
-            }
 
             regionList.ItemsSource = imageSources;
             ImageEditorControl.ImageBitmap = new WriteableBitmap(imageSources[0].Image);
