@@ -6,7 +6,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:WpfOcrInvoiceExtractor"
         mc:Ignorable="d"
-        Title="InvoiceTemplateViewer" Height="450" Width="800">
+        Title="InvoiceTemplateViewer">
     <Grid>
         <uc:ImageEditor x:Name="ImageEditorControl" ScalingMode="Vertical" Drawable="True"></uc:ImageEditor>
     </Grid>

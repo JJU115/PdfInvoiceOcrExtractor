@@ -7,8 +7,38 @@
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         mc:Ignorable="d"
         Title="MainWindow"  Left="0" Top="0" d:DesignHeight="264.697" d:DesignWidth="270.281">
-    <Grid>
+    <Grid Background="Gray">
 
+        <Grid.RowDefinitions>
+            <RowDefinition Height="auto"></RowDefinition>
+            <RowDefinition Height="*"></RowDefinition>
+        </Grid.RowDefinitions>
+
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,20" Grid.Row="0">
+            <Button Name="NewImportButton">New Import</Button>
+            <Button>Settings</Button>
+        </StackPanel>
+
+        <ItemsControl Name="templateList" Grid.Row="1">
+            
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Background="Gray" BorderBrush="GhostWhite" BorderThickness="3" Margin="15,15,15,15">
+                        <StackPanel Orientation="Vertical">
+                            <Image Source="{Binding Display}" Height="100" Mouse.MouseDown="Template_Click"></Image>
+                            <TextBlock FontSize="14" FontWeight="Bold" FontStyle="Italic">Name</TextBlock>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+
+        </ItemsControl>
     </Grid>
 
 </Window>

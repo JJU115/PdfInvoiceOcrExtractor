@@ -6,15 +6,18 @@ using System.Linq;
 using System.Security.Permissions;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Media.Imaging;
+using System.Xml.Serialization;
 
 namespace WpfOcrInvoiceExtractor
 {
     public class InvoiceTemplate
     {
-        public List<ImageRegion> ImageRegions;
+        public List<ImageRegion> ImageRegions { get; set; }
 
-        public Vendor Vendor;
+        public Vendor Vendor { get; set; }
 
-        public Bitmap Display;
+        [XmlIgnore]
+        public BitmapImage Display { get; set; }
     }
 }

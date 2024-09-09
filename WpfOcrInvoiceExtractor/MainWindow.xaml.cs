@@ -7,6 +7,7 @@ using Ghostscript.NET.Rasterizer;
 using System.IO;
 using Intuit.Ipp.Data;
 using System.Xml.Serialization;
+using Microsoft.Win32;
 
 
 namespace WpfOcrInvoiceExtractor
@@ -24,9 +25,10 @@ namespace WpfOcrInvoiceExtractor
             this.DataContext = this;
 
             invoiceTemplates = RetrieveTemplateData();
+            templateList.ItemsSource = invoiceTemplates;
 
-            this.Width = SystemParameters.PrimaryScreenWidth / 2;
-            this.Height = SystemParameters.PrimaryScreenHeight / 1.1;
+            this.Width = SystemParameters.PrimaryScreenWidth * 0.75;
+            this.Height = SystemParameters.PrimaryScreenHeight * 0.75;
             /*var oldBitmap = ConvertPdfToImage()[0];
 
             var hOldBitmap = oldBitmap.GetHbitmap(System.Drawing.Color.Transparent);
@@ -56,7 +58,11 @@ namespace WpfOcrInvoiceExtractor
              */
 
             //Store files of template data in this path
-            
+            if (e.Key == Key.I) {
+                InvoiceTemplateViewer itv = new(@"testImages\wesco_264010700_20220521_23275357_9136520875.pdf");
+                itv.Show();
+                return;
+            }
 
             List<ImageRegion> regionList = new();
             string sourceDirectory = @"C:\Users\Justin\source\repos\WpfOcrInvoiceExtractor\WpfOcrInvoiceExtractor\testimages";
@@ -86,13 +92,23 @@ namespace WpfOcrInvoiceExtractor
         private List<InvoiceTemplate> RetrieveTemplateData()
         {
             string localDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            if (!Directory.Exists($"{localDataPath}\\QBO_Invoice_Parser")) Directory.CreateDirectory($"{localDataPath}\\QBO_Invoice_Parser");
+
             XmlSerializer serializer = new XmlSerializer(typeof(InvoiceTemplate));
-            return (List<InvoiceTemplate>)Directory.EnumerateFiles($"{localDataPath}\\QBO_Invoice_Parser").Where(f => f.StartsWith("template_")).Select(f =>
+            var list = Directory.EnumerateFiles($"{localDataPath}\\QBO_Invoice_Parser").Where(f => f.StartsWith("template_")).Select(f =>
             {
                 FileStream fs = new FileStream(f, FileMode.Open);
                 InvoiceTemplate it = (InvoiceTemplate)serializer.Deserialize(fs);
                 return it;
             });
+            List<InvoiceTemplate> l = list.ToList();
+            InvoiceTemplate addTemplate = new InvoiceTemplate();
+            string fileName = @"C:\Users\Justin\source\repos\WpfOcrInvoiceExtractor\WpfOcrInvoiceExtractor\testimages\add-template.png";
+            Uri uri = new Uri(fileName, UriKind.RelativeOrAbsolute);
+            addTemplate.Display = new BitmapImage(uri);
+            addTemplate.Vendor.DisplayName = "NewVendor";
+            l.Insert(0, addTemplate);
+            return l;
         }
 
         private static void WriteTemplateToData(InvoiceTemplate template)
@@ -129,6 +145,27 @@ namespace WpfOcrInvoiceExtractor
                 }
             }
             return pdfImages;
+        }
+
+        private void Template_Click(object sender, MouseButtonEventArgs e)
+        {
+            var template = sender;
+            //if template vendor equals 
+        }
+
+        private void AddNewTemplate()
+        {
+            OpenFileDialog openFileDialog = new OpenFileDialog();
+            openFileDialog.Filter = "PDF Files|*.pdf";
+
+            Nullable<bool> result = openFileDialog.ShowDialog();
+
+            // Process open file dialog box results
+            if (result == true)
+            {
+                InvoiceTemplateViewer itr = new InvoiceTemplateViewer(openFileDialog.FileName);
+                itr.Show();
+            }
         }
     }
 }

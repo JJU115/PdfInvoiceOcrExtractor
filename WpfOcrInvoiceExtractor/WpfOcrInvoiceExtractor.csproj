@@ -29,9 +29,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="testimages\testcrop.jpg">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Resource>
     <Resource Include="testimages\wesco_invoice_date.jpg">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Resource>
@@ -54,6 +51,9 @@
 
   <ItemGroup>
     <None Update="tessdata\eng.traineddata">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="testimages\add-template.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="testimages\wesco_264010700_20220521_23275357_9136520875.pdf">
