@@ -90,7 +90,7 @@ namespace WpfOcrInvoiceExtractor
         public List<Bitmap> ConvertPdfToImage(string filePath)
         {
             int desired_dpi = 300;
-
+          
             string inputPdfPath = filePath;
             string outputPath = @"C:\Users\Justin\Pictures";
 
@@ -108,6 +108,23 @@ namespace WpfOcrInvoiceExtractor
                 }
             }
             return pdfImages;
+        }
+
+        private void Continue_Button_Click(object sender, RoutedEventArgs e)
+        {
+            List<ImageRegion> imageRegions = new();
+            int index = 0;
+            foreach (var region in ImageEditorControl.RegionsSource) {
+                CroppedBitmap cropped = new(ImageEditorControl.ImageBitmap, region);
+                imageRegions.Add(new() { Image = cropped, Name="", Index=index++ });
+            }
+            RegionViewer rv = new(imageRegions);
+            rv.Show();            
+        }
+
+        private void EraseAll_Button_Click(object sender, RoutedEventArgs e)
+        {
+
         }
     }
 }

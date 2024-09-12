@@ -8,6 +8,14 @@
         mc:Ignorable="d"
         Title="InvoiceTemplateViewer">
     <Grid>
-        <uc:ImageEditor x:Name="ImageEditorControl" ScalingMode="Vertical" Drawable="True"></uc:ImageEditor>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <StackPanel Orientation="Horizontal" Grid.Row="0">
+            <Button Click="Continue_Button_Click">Continue</Button>
+            <Button Click="EraseAll_Button_Click">Erase all highlights</Button>
+        </StackPanel>
+        <uc:ImageEditor x:Name="ImageEditorControl" Grid.Row="1" ScalingMode="Vertical" Drawable="True"></uc:ImageEditor>
     </Grid>
 </Window>

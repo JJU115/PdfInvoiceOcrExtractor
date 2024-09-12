@@ -18,7 +18,9 @@ namespace WpfOcrInvoiceExtractor
     public class ImageRegion
     {
         [XmlIgnore]
-        public BitmapImage Image { get; set; }
+        public CroppedBitmap Image { get; set; }
+        [XmlIgnore]
+        public BitmapImage DebugImage { get; set; }
         public string Name { get; set; }
         public int Index { get; set; }
         public BillTopic BillTopic { get; set; }
@@ -27,9 +29,9 @@ namespace WpfOcrInvoiceExtractor
 
         public ImageRegion(string fileName, int index) {
             Uri uri = new Uri(fileName, UriKind.RelativeOrAbsolute);
-            this.Image = new BitmapImage(uri);
+            this.DebugImage = new BitmapImage(uri);
             this.Name = "";
-            this.Image.DecodePixelHeight = 100;
+            this.DebugImage.DecodePixelHeight = 100;
             this.Index = index;
         }
     }

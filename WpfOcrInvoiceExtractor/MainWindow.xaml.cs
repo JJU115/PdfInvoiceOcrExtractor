@@ -8,6 +8,7 @@ using System.IO;
 using Intuit.Ipp.Data;
 using System.Xml.Serialization;
 using Microsoft.Win32;
+using System.Windows.Controls;
 
 
 namespace WpfOcrInvoiceExtractor
@@ -26,23 +27,11 @@ namespace WpfOcrInvoiceExtractor
 
             invoiceTemplates = RetrieveTemplateData();
             templateList.ItemsSource = invoiceTemplates;
+            templateList.MouseDown += Template_Click;
 
             this.Width = SystemParameters.PrimaryScreenWidth * 0.75;
             this.Height = SystemParameters.PrimaryScreenHeight * 0.75;
-            /*var oldBitmap = ConvertPdfToImage()[0];
-
-            var hOldBitmap = oldBitmap.GetHbitmap(System.Drawing.Color.Transparent);
-            var bitmapSource =
-               Imaging.CreateBitmapSourceFromHBitmap(
-                 hOldBitmap,
-                 IntPtr.Zero,
-                 new Int32Rect(0, 0, oldBitmap.Width, oldBitmap.Height),
-                 null);*/
-
-            //this.Loaded += Window_Loaded;
             this.KeyDown += MainWindow_KeyDown;
-
-            //ImageEditorControl.ImageBitmap = new WriteableBitmap(bitmapSource);
           
         }
 
@@ -106,7 +95,7 @@ namespace WpfOcrInvoiceExtractor
             string fileName = @"C:\Users\Justin\source\repos\WpfOcrInvoiceExtractor\WpfOcrInvoiceExtractor\testimages\add-template.png";
             Uri uri = new Uri(fileName, UriKind.RelativeOrAbsolute);
             addTemplate.Display = new BitmapImage(uri);
-            addTemplate.Vendor.DisplayName = "NewVendor";
+            addTemplate.Vendor = new Vendor { DisplayName = "NewVendor" };
             l.Insert(0, addTemplate);
             return l;
         }
@@ -124,33 +113,15 @@ namespace WpfOcrInvoiceExtractor
 
         }
 
-        public List<Bitmap> ConvertPdfToImage()
-        {
-            int desired_dpi = 300;
-
-            string inputPdfPath = @"testImages\wesco_264010700_20220521_23275357_9136520875.pdf";
-            string outputPath = @"C:\Users\Justin\Pictures";
-
-            List<Bitmap> pdfImages = new List<Bitmap>();
-            using (var rasterizer = new GhostscriptRasterizer())
-            {
-                rasterizer.Open(inputPdfPath);
-
-                for (var pageNumber = 1; pageNumber <= rasterizer.PageCount; pageNumber++)
-                {
-                    var pageFilePath = System.IO.Path.Combine(outputPath, string.Format("Page-{0}.png", pageNumber));
-
-                    var img = rasterizer.GetPage(desired_dpi, pageNumber);
-                    pdfImages.Add(new Bitmap(img));
-                }
-            }
-            return pdfImages;
-        }
 
         private void Template_Click(object sender, MouseButtonEventArgs e)
         {
-            var template = sender;
-            //if template vendor equals 
+            var template = ((ItemsControl)sender).Items.CurrentItem as InvoiceTemplate;
+            if (template.Vendor.DisplayName == "NewVendor") AddNewTemplate();
+            else
+            {
+
+            }
         }
 
         private void AddNewTemplate()

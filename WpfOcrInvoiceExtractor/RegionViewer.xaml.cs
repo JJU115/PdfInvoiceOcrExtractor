@@ -28,7 +28,8 @@ namespace WpfOcrInvoiceExtractor
             this.Width = SystemParameters.PrimaryScreenWidth / 2;
             this.Height = SystemParameters.PrimaryScreenHeight;
 
-            regionList.ItemsSource = imageSources;
+            this.imageSources = regions;
+            regionList.ItemsSource = this.imageSources;
             ImageEditorControl.ImageBitmap = new WriteableBitmap(imageSources[0].Image);
             focusedRegion = 0;
             ((RegionDataTemplateSelector)this.Resources["RegionDataTemplateSelector"]).SelectedIndex = 0;

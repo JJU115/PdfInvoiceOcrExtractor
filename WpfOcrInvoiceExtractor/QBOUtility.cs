@@ -106,8 +106,15 @@ namespace WpfOcrInvoiceExtractor
             AccountBasedExpenseLineDetail lineDetail = new AccountBasedExpenseLineDetail();
 
             foreach (ImageRegion region in imageRegions)
-            {               
-                Pix pix = PixConverter.ToPix(new Bitmap(region.Image.StreamSource));
+            {
+                JpegBitmapEncoder encoder = new JpegBitmapEncoder();
+                MemoryStream memoryStream = new MemoryStream();
+
+                encoder.Frames.Add(BitmapFrame.Create(region.Image));
+                encoder.Save(memoryStream);
+                memoryStream.Position = 0;
+
+                Pix pix = PixConverter.ToPix(new Bitmap(memoryStream));
                 Page page = engine.Process(pix);
                 Debug.WriteLine($"{page.GetText()}");
 
