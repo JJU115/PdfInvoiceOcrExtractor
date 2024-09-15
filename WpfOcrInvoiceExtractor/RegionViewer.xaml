@@ -47,13 +47,17 @@
             <StackPanel Orientation="Horizontal" Grid.Row="0">
                 <Button Click="runOCRTestOnCurrent">OCR Test</Button>
                 <Button>Delete</Button>
+                <Button Click="SaveRegions_Click">Save Regions</Button>
             </StackPanel>
             <uc:ImageEditor x:Name="ImageEditorControl" ScalingMode="Horizontal" Drawable="False" Grid.Row="1"></uc:ImageEditor>
             <StackPanel Orientation="Horizontal" Margin="0,0,0,0" Grid.Row="2">
-                <TextBox>Region Label</TextBox>
-                <Button>Edit Label</Button>
-                <Button>Save</Button>
-                <Button>Mark as Table</Button>
+                <ComboBox Name="billTopics">
+                    <ComboBoxItem>Vendor Name</ComboBoxItem>
+                    <ComboBoxItem>Items Table</ComboBoxItem>
+                    <ComboBoxItem>Invoice Number</ComboBoxItem>
+                    <ComboBoxItem>Invoice Date</ComboBoxItem>
+                    <ComboBoxItem>Total Amount</ComboBoxItem>
+                </ComboBox>
             </StackPanel>
         </Grid>
 

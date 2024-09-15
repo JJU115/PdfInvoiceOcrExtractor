@@ -7,6 +7,7 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Xml.Serialization;
 using Tesseract;
 
 namespace WpfOcrInvoiceExtractor
@@ -18,14 +19,14 @@ namespace WpfOcrInvoiceExtractor
     public partial class RegionViewer : Window
     {
         TesseractEngine engine = new TesseractEngine("./tessdata", "eng");
-        List<ImageRegion> imageSources = new List<ImageRegion>();
+        public List<ImageRegion> imageSources = new List<ImageRegion>();
         int focusedRegion;
 
         public RegionViewer(List<ImageRegion> regions)
         {
             InitializeComponent();
             this.DataContext = this;
-            this.Width = SystemParameters.PrimaryScreenWidth / 2;
+            this.Width = SystemParameters.PrimaryScreenWidth * 0.75;
             this.Height = SystemParameters.PrimaryScreenHeight;
 
             this.imageSources = regions;
@@ -58,6 +59,12 @@ namespace WpfOcrInvoiceExtractor
                 Debug.WriteLine($"{page.GetText()}");
                 page.Dispose();
             }
+        }
+
+        private void SaveRegions_Click(object sender, RoutedEventArgs e)
+        {
+            DialogResult = true;
+            Close();
         }
     }
 

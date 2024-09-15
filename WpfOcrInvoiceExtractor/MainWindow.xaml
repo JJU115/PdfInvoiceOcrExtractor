@@ -31,7 +31,7 @@
                 <DataTemplate>
                     <Border Background="Gray" BorderBrush="GhostWhite" BorderThickness="3" Margin="15,15,15,15">
                         <StackPanel Orientation="Vertical">
-                            <Image Source="{Binding Display}" Height="100" Tag=""></Image>
+                            <Image Source="{Binding Display}" Height="200" Tag=""></Image>
                             <TextBlock FontSize="14" FontWeight="Bold" FontStyle="Italic">Name</TextBlock>
                         </StackPanel>
                     </Border>

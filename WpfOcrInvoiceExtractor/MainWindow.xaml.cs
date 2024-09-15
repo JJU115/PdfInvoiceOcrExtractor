@@ -9,6 +9,9 @@ using Intuit.Ipp.Data;
 using System.Xml.Serialization;
 using Microsoft.Win32;
 using System.Windows.Controls;
+using System.Collections.ObjectModel;
+using System.Windows.Media;
+using System.Linq;
 
 
 namespace WpfOcrInvoiceExtractor
@@ -18,14 +21,16 @@ namespace WpfOcrInvoiceExtractor
     /// </summary>
     public partial class MainWindow : Window
     {
-        List<InvoiceTemplate> invoiceTemplates;
-        //public List<Int32Rect> Regions = new List<Int32Rect>(); //Bound to image editor
+        ObservableCollection<InvoiceTemplate> invoiceTemplates;
+        InvoiceTemplateViewer? templateViewer;
+        RegionViewer? regionViewer;
+
         public MainWindow()
         {           
             InitializeComponent();
             this.DataContext = this;
 
-            invoiceTemplates = RetrieveTemplateData();
+            invoiceTemplates = new ObservableCollection<InvoiceTemplate>(RetrieveTemplateData());
             templateList.ItemsSource = invoiceTemplates;
             templateList.MouseDown += Template_Click;
 
@@ -75,19 +80,23 @@ namespace WpfOcrInvoiceExtractor
                     Id = "58"
                 };
                await QBOUtility.CreateNewBillToQbo(regionList, wesco);
+            } else if (e.Key == Key.L)
+            {
+                this.RetrieveTemplateData();
             }
         }
 
-        private List<InvoiceTemplate> RetrieveTemplateData()
+        public List<InvoiceTemplate> RetrieveTemplateData()
         {
             string localDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             if (!Directory.Exists($"{localDataPath}\\QBO_Invoice_Parser")) Directory.CreateDirectory($"{localDataPath}\\QBO_Invoice_Parser");
-
+            
             XmlSerializer serializer = new XmlSerializer(typeof(InvoiceTemplate));
-            var list = Directory.EnumerateFiles($"{localDataPath}\\QBO_Invoice_Parser").Where(f => f.StartsWith("template_")).Select(f =>
+            var list = Directory.GetFiles($"{localDataPath}\\QBO_Invoice_Parser").Where(f => f.EndsWith("xml")).Select(f =>
             {
                 FileStream fs = new FileStream(f, FileMode.Open);
                 InvoiceTemplate it = (InvoiceTemplate)serializer.Deserialize(fs);
+                it.Display.DecodePixelHeight = 200;
                 return it;
             });
             List<InvoiceTemplate> l = list.ToList();
@@ -100,7 +109,7 @@ namespace WpfOcrInvoiceExtractor
             return l;
         }
 
-        private static void WriteTemplateToData(InvoiceTemplate template)
+        private void WriteTemplateToData(InvoiceTemplate template)
         {
             string localDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             if (!Directory.Exists($"{localDataPath}\\QBO_Invoice_Parser")) Directory.CreateDirectory($"{localDataPath}\\QBO_Invoice_Parser");
@@ -110,7 +119,7 @@ namespace WpfOcrInvoiceExtractor
             
             serializer.Serialize(writer, template);
             writer.Close();
-
+            invoiceTemplates.Add(template);
         }
 
 
@@ -129,13 +138,38 @@ namespace WpfOcrInvoiceExtractor
             OpenFileDialog openFileDialog = new OpenFileDialog();
             openFileDialog.Filter = "PDF Files|*.pdf";
 
-            Nullable<bool> result = openFileDialog.ShowDialog();
+            bool? result = openFileDialog.ShowDialog();
 
             // Process open file dialog box results
             if (result == true)
             {
-                InvoiceTemplateViewer itr = new InvoiceTemplateViewer(openFileDialog.FileName);
-                itr.Show();
+                templateViewer = new InvoiceTemplateViewer(openFileDialog.FileName);
+                bool? viewerResult = templateViewer.ShowDialog();
+
+                if (viewerResult == true) {
+                    JpegBitmapEncoder encoder = new();
+                    MemoryStream memoryStream = new();
+                    BitmapImage templateDisplay = new BitmapImage();
+
+                    encoder.Frames.Add(BitmapFrame.Create(templateViewer.invoiceDisplay));
+                    encoder.Save(memoryStream);
+                    memoryStream.Position = 0;
+              
+                    templateDisplay.BeginInit();
+                    templateDisplay.StreamSource = memoryStream;
+                    templateDisplay.EndInit();
+                    
+
+                    regionViewer = new RegionViewer(templateViewer.imageRegions);
+                    bool? regionViewerResult = regionViewer.ShowDialog();
+
+                    if (regionViewerResult == true) {
+
+                        InvoiceTemplate template = new() { ImageRegions = regionViewer.imageSources, Vendor = new Vendor(), Display = templateDisplay };
+                        WriteTemplateToData(template);
+                    }
+                    memoryStream.Close();
+                }
             }
         }
     }

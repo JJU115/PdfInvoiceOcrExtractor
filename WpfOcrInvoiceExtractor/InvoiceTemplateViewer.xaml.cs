@@ -24,67 +24,26 @@ namespace WpfOcrInvoiceExtractor
     /// </summary>
     public partial class InvoiceTemplateViewer : Window
     {
+        public BitmapSource invoiceDisplay;
+        public List<ImageRegion> imageRegions = new List<ImageRegion>();
         public InvoiceTemplateViewer(string pdfFilePath)
         {
             InitializeComponent();
             this.DataContext = this;
-
-            this.KeyDown += TemplateViewer_KeyDown;
 
             this.Width = SystemParameters.PrimaryScreenWidth / 2;
             this.Height = SystemParameters.PrimaryScreenHeight / 1.1;
             var oldBitmap = ConvertPdfToImage(pdfFilePath)[0];
 
             var hOldBitmap = oldBitmap.GetHbitmap(System.Drawing.Color.Transparent);
-            var bitmapSource =
+            this.invoiceDisplay =
                Imaging.CreateBitmapSourceFromHBitmap(
                  hOldBitmap,
                  IntPtr.Zero,
                  new Int32Rect(0, 0, oldBitmap.Width, oldBitmap.Height),
                  null);
 
-            ImageEditorControl.ImageBitmap = new WriteableBitmap(bitmapSource);
-        }
-
-
-        private async void TemplateViewer_KeyDown(object sender, KeyEventArgs e)
-        {
-            //Bill upload procedure:
-            /*
-             * 1. PDF uploaded, translate it to an image AND/OR read the PDF to get the vendor name
-             * 2. Match vendor name to template by checking all templates to get template to use
-             * 3. When invoice template was created the user would have selected an official vendor so template has vendor ID
-             * 4. Pull stored image regions from template and pass them to process method
-             * 5. Process method return Bill object, pass that and vendor id to upload method
-             */
-
-            //Store files of template data in this path
-
-
-            List<ImageRegion> regionList = new();
-            string sourceDirectory = @"C:\Users\Justin\source\repos\WpfOcrInvoiceExtractor\WpfOcrInvoiceExtractor\testimages";
-            var txtFiles = Directory.EnumerateFiles(sourceDirectory).Where(f => f.EndsWith("jpg"));
-
-            for (var i = 0; i < txtFiles.Count(); i++)
-            {
-                string f = txtFiles.ElementAt(i).Replace("\\", "/");
-                regionList.Add(new ImageRegion(f, i));
-            }
-
-            if (e.Key == Key.R)
-            {
-
-                RegionViewer rv = new(regionList);
-                rv.Show();
-            }
-            else if (e.Key == Key.F)
-            {
-                Vendor wesco = new()
-                {
-                    Id = "58"
-                };
-                await QBOUtility.CreateNewBillToQbo(regionList, wesco);
-            }
+            ImageEditorControl.ImageBitmap = new WriteableBitmap(this.invoiceDisplay);
         }
 
         public List<Bitmap> ConvertPdfToImage(string filePath)
@@ -112,14 +71,13 @@ namespace WpfOcrInvoiceExtractor
 
         private void Continue_Button_Click(object sender, RoutedEventArgs e)
         {
-            List<ImageRegion> imageRegions = new();
             int index = 0;
             foreach (var region in ImageEditorControl.RegionsSource) {
                 CroppedBitmap cropped = new(ImageEditorControl.ImageBitmap, region);
                 imageRegions.Add(new() { Image = cropped, Name="", Index=index++ });
             }
-            RegionViewer rv = new(imageRegions);
-            rv.Show();            
+            DialogResult = true;
+            Close();           
         }
 
         private void EraseAll_Button_Click(object sender, RoutedEventArgs e)
