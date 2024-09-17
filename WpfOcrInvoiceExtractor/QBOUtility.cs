@@ -13,10 +13,17 @@ using Tesseract;
 using System.Drawing;
 using System.Windows.Media.Imaging;
 using Intuit.Ipp.Data;
+using System.Security.Policy;
+using Intuit.Ipp.Core.Configuration;
+using System.Net.Http.Json;
+using Newtonsoft.Json.Linq;
+using System.Runtime.CompilerServices;
+using System.Windows.Controls;
+using System;
 
 namespace WpfOcrInvoiceExtractor
 {
-    
+
     class QBOUtility
     {
         readonly static string BASE_URL = "https://sandbox-quickbooks.api.intuit.com";
@@ -73,6 +80,7 @@ namespace WpfOcrInvoiceExtractor
 
             if (!accessValid && !refreshValid)
             {
+                MessageBox.Show("You must authenticate to QuickBooks Online", "Authentication needed", MessageBoxButton.OK, MessageBoxImage.Information, MessageBoxResult.OK);
                 authWindow.Closed += (s, a) => authFinished.Start();
                 authWindow.Show();
                 await authFinished;
@@ -80,6 +88,7 @@ namespace WpfOcrInvoiceExtractor
             }
             else if (!accessValid)
             {
+                MessageBox.Show("You must authenticate to QuickBooks Online", "Authentication needed", MessageBoxButton.OK, MessageBoxImage.Information, MessageBoxResult.OK);
                 Client ??= new(Tokens.ClientId, Tokens.ClientSecret, Tokens.RedirectUrl, Tokens.Environment);
                 TokenResponse response = await Client.RefreshTokenAsync(Tokens.RefreshToken);
                 if (!response.IsError)
@@ -115,7 +124,7 @@ namespace WpfOcrInvoiceExtractor
                 memoryStream.Position = 0;
 
                 Pix pix = PixConverter.ToPix(new Bitmap(memoryStream));
-                Page page = engine.Process(pix);
+                Tesseract.Page page = engine.Process(pix);
                 Debug.WriteLine($"{page.GetText()}");
 
                 switch (region.BillTopic)
@@ -129,7 +138,7 @@ namespace WpfOcrInvoiceExtractor
                     case BillTopic.BillNumber:
                         bill.DocNumber = page.GetText(); //Remove all non numeric characters
                         break;
-                    case BillTopic.Category:       
+                    case BillTopic.Category:
                         lineDetail.AccountRef = new ReferenceType();
                         break;
                     case BillTopic.Class:
@@ -138,7 +147,7 @@ namespace WpfOcrInvoiceExtractor
                     case BillTopic.Description:
                         bill.Line[0].Description = "Default description";
                         break;
-                    case BillTopic.SalesTax:    
+                    case BillTopic.SalesTax:
                         lineDetail.TaxCodeRef = new ReferenceType();
                         break;
                     case BillTopic.Vendor:
@@ -225,7 +234,7 @@ namespace WpfOcrInvoiceExtractor
             {
                 Initialize();
             }
-            
+
             return Client.GetAuthorizationURL(scopes.ToList());
         }
 
@@ -343,7 +352,27 @@ namespace WpfOcrInvoiceExtractor
 
                 return valid;
             } catch { return false; }
-            
+
+        }
+
+        static List<Vendor> CachedVendorList = new List<Vendor>();
+
+        public static async Task<List<Vendor>> GetVendorList() {
+            if (StaticClient == null) StaticClient = new HttpClient();
+
+            if (!await CheckTokens()) return new List<Vendor>();
+            if (CachedVendorList.Count > 0) return CachedVendorList;
+
+            string url = $"{BASE_URL}/v3/company/{Tokens!.RealmId}/query?query=select DisplayName, Id from vendor";          
+            HttpRequestMessage requestMessage = new HttpRequestMessage(HttpMethod.Get, url);
+            requestMessage.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("bearer", Tokens.AccessToken);
+            StaticClient.DefaultRequestHeaders.Add("Accept", "application/json");
+            HttpResponseMessage response = await StaticClient.SendAsync(requestMessage);
+            string queryResult = await response.Content.ReadAsStringAsync();
+            JObject QueryResponse = JObject.Parse(queryResult);
+            JArray vendors = (JArray)QueryResponse["QueryResponse"]["Vendor"];
+            CachedVendorList = vendors.Select(vendor => new Vendor() { DisplayName = (string)vendor["DisplayName"], Id = (string)vendor["Id"] }).ToList();
+            return CachedVendorList;
         }
     }
 }

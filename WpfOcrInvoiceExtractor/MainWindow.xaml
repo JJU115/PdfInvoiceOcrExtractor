@@ -20,23 +20,28 @@
         </StackPanel>
 
         <ItemsControl Name="templateList" Grid.Row="1">
-            
-            <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <WrapPanel />
-                </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
 
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
                     <Border Background="Gray" BorderBrush="GhostWhite" BorderThickness="3" Margin="15,15,15,15">
                         <StackPanel Orientation="Vertical">
-                            <Image Source="{Binding Display}" Height="200" Tag=""></Image>
+                            <StackPanel Orientation="Horizontal" Visibility="{Binding HideButtons}">
+                                <Button Click="Edit_Template">Edit</Button>
+                                <Button Click="Delete_Template">Delete</Button>
+                            </StackPanel>
+                            <Image Source="{Binding Display}" Height="200"></Image>
                             <TextBlock FontSize="14" FontWeight="Bold" FontStyle="Italic">Name</TextBlock>
                         </StackPanel>
                     </Border>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
+            
+
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
         </ItemsControl>
     </Grid>
 

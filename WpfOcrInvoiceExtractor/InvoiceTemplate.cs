@@ -20,6 +20,9 @@ namespace WpfOcrInvoiceExtractor
         public Vendor Vendor { get; set; }
 
         [XmlIgnore]
+        public string HideButtons { get; set; } = "Visible";
+
+        [XmlIgnore]
         public BitmapImage Display { get; set; }
 
         [Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]

@@ -12,6 +12,7 @@ using System.Windows.Controls;
 using System.Collections.ObjectModel;
 using System.Windows.Media;
 using System.Linq;
+using System.Diagnostics;
 
 
 namespace WpfOcrInvoiceExtractor
@@ -37,7 +38,7 @@ namespace WpfOcrInvoiceExtractor
             this.Width = SystemParameters.PrimaryScreenWidth * 0.75;
             this.Height = SystemParameters.PrimaryScreenHeight * 0.75;
             this.KeyDown += MainWindow_KeyDown;
-          
+            
         }
 
         private async void MainWindow_KeyDown(object sender, KeyEventArgs e)
@@ -83,6 +84,10 @@ namespace WpfOcrInvoiceExtractor
             } else if (e.Key == Key.L)
             {
                 this.RetrieveTemplateData();
+            } else if (e.Key == Key.V)
+            {
+                List<Vendor> vendors = await QBOUtility.GetVendorList();
+                Debug.WriteLine(vendors);
             }
         }
 
@@ -105,6 +110,7 @@ namespace WpfOcrInvoiceExtractor
             Uri uri = new Uri(fileName, UriKind.RelativeOrAbsolute);
             addTemplate.Display = new BitmapImage(uri);
             addTemplate.Vendor = new Vendor { DisplayName = "NewVendor" };
+            addTemplate.HideButtons = "Hidden";
             l.Insert(0, addTemplate);
             return l;
         }
@@ -159,7 +165,6 @@ namespace WpfOcrInvoiceExtractor
                     templateDisplay.StreamSource = memoryStream;
                     templateDisplay.EndInit();
                     
-
                     regionViewer = new RegionViewer(templateViewer.imageRegions);
                     bool? regionViewerResult = regionViewer.ShowDialog();
 
@@ -171,6 +176,16 @@ namespace WpfOcrInvoiceExtractor
                     memoryStream.Close();
                 }
             }
+        }
+
+        private void Edit_Template(object sender, RoutedEventArgs e)
+        {
+
+        }
+
+        private void Delete_Template(object sender, RoutedEventArgs e)
+        {
+
         }
     }
 }

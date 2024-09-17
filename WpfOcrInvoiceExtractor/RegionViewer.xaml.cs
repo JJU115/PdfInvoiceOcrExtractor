@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using Intuit.Ipp.Data;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Windows;
@@ -20,6 +21,7 @@ namespace WpfOcrInvoiceExtractor
     {
         TesseractEngine engine = new TesseractEngine("./tessdata", "eng");
         public List<ImageRegion> imageSources = new List<ImageRegion>();
+        public Vendor selectedVendor;
         int focusedRegion;
 
         public RegionViewer(List<ImageRegion> regions)
@@ -61,10 +63,18 @@ namespace WpfOcrInvoiceExtractor
             }
         }
 
-        private void SaveRegions_Click(object sender, RoutedEventArgs e)
+        private async void SaveRegions_Click(object sender, RoutedEventArgs e)
         {
-            DialogResult = true;
-            Close();
+            List<Vendor> vendors = await QBOUtility.GetVendorList();
+            //Dialog to get user to select a vendor
+            VendorSelectDialog vsd = new VendorSelectDialog(vendors);
+            bool? vendorResult = vsd.ShowDialog();
+            if (vendorResult == true) {
+                this.selectedVendor = (Vendor)vsd.vendorBox.SelectedItem;
+                DialogResult = true;
+                Close();
+            }
+            
         }
     }
 
