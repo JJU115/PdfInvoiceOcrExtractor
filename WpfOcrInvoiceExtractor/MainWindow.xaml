@@ -29,13 +29,12 @@
                                 <Button Click="Edit_Template">Edit</Button>
                                 <Button Click="Delete_Template">Delete</Button>
                             </StackPanel>
-                            <Image Source="{Binding Display}" Height="200"></Image>
-                            <TextBlock FontSize="14" FontWeight="Bold" FontStyle="Italic">Name</TextBlock>
+                            <Image Source="{Binding Display}" Height="200" MouseDown="Template_Click"></Image>
+                            <TextBlock Text="{Binding Path=Vendor.DisplayName}" FontSize="14" FontWeight="Bold"></TextBlock>
                         </StackPanel>
                     </Border>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
-            
 
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>

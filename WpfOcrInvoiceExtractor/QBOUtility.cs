@@ -88,7 +88,6 @@ namespace WpfOcrInvoiceExtractor
             }
             else if (!accessValid)
             {
-                MessageBox.Show("You must authenticate to QuickBooks Online", "Authentication needed", MessageBoxButton.OK, MessageBoxImage.Information, MessageBoxResult.OK);
                 Client ??= new(Tokens.ClientId, Tokens.ClientSecret, Tokens.RedirectUrl, Tokens.Environment);
                 TokenResponse response = await Client.RefreshTokenAsync(Tokens.RefreshToken);
                 if (!response.IsError)

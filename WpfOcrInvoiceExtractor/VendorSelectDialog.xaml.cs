@@ -28,7 +28,12 @@ namespace WpfOcrInvoiceExtractor
 
         private void okButton_Click(object sender, RoutedEventArgs e)
         {
-
+            if (vendorBox.SelectedIndex > -1)
+            {
+                this.DialogResult = true;
+                this.Close();
+            }
+           
         }
     }
 }

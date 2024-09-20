@@ -19,7 +19,13 @@
         
         <StackPanel Orientation="Horizontal" Grid.ColumnSpan="2">
             <Label VerticalAlignment="Center">Vendor:</Label>
-            <ComboBox Name="vendorBox"></ComboBox>
+            <ComboBox Name="vendorBox">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <Label Content="{Binding DisplayName}"></Label>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
         </StackPanel>
 
         <StackPanel Orientation="Horizontal" Grid.Row="1" Grid.Column="1" HorizontalAlignment="Right">

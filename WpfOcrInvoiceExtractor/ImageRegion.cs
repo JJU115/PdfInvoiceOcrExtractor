@@ -8,11 +8,13 @@ namespace WpfOcrInvoiceExtractor
         Amount,
         BillDate,
         BillNumber,
+        Vendor,
+        ItemsTable,
         Category,
         Class,
         Description,
         SalesTax,
-        Vendor
+        
     }
 
     public class ImageRegion

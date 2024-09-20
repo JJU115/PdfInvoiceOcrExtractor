@@ -33,7 +33,6 @@ namespace WpfOcrInvoiceExtractor
 
             invoiceTemplates = new ObservableCollection<InvoiceTemplate>(RetrieveTemplateData());
             templateList.ItemsSource = invoiceTemplates;
-            templateList.MouseDown += Template_Click;
 
             this.Width = SystemParameters.PrimaryScreenWidth * 0.75;
             this.Height = SystemParameters.PrimaryScreenHeight * 0.75;
@@ -72,7 +71,7 @@ namespace WpfOcrInvoiceExtractor
             if (e.Key == Key.R)
             {
                 
-                RegionViewer rv = new(regionList);
+                RegionViewer rv = new(regionList, []);
                 rv.Show();
             }
             else if (e.Key == Key.F) {
@@ -109,8 +108,7 @@ namespace WpfOcrInvoiceExtractor
             string fileName = @"C:\Users\Justin\source\repos\WpfOcrInvoiceExtractor\WpfOcrInvoiceExtractor\testimages\add-template.png";
             Uri uri = new Uri(fileName, UriKind.RelativeOrAbsolute);
             addTemplate.Display = new BitmapImage(uri);
-            addTemplate.Vendor = new Vendor { DisplayName = "NewVendor" };
-            addTemplate.HideButtons = "Hidden";
+            addTemplate.Vendor = new Vendor { DisplayName = "New Vendor Invoice Template" };
             l.Insert(0, addTemplate);
             return l;
         }
@@ -121,18 +119,17 @@ namespace WpfOcrInvoiceExtractor
             if (!Directory.Exists($"{localDataPath}\\QBO_Invoice_Parser")) Directory.CreateDirectory($"{localDataPath}\\QBO_Invoice_Parser");
 
             XmlSerializer serializer = new XmlSerializer(typeof(InvoiceTemplate));
-            TextWriter writer = new StreamWriter($"{localDataPath}\\QBO_Invoice_Parser\\template_{template.Vendor.DisplayName}.xml");
+            TextWriter writer = new StreamWriter($"{localDataPath}\\QBO_Invoice_Parser\\template_{template.Vendor.DisplayName}_{template.Vendor.Id}.xml");
             
             serializer.Serialize(writer, template);
             writer.Close();
             invoiceTemplates.Add(template);
         }
 
-
         private void Template_Click(object sender, MouseButtonEventArgs e)
         {
-            var template = ((ItemsControl)sender).Items.CurrentItem as InvoiceTemplate;
-            if (template.Vendor.DisplayName == "NewVendor") AddNewTemplate();
+            var template = (InvoiceTemplate)(sender as System.Windows.Controls.Image).DataContext;
+            if (template.Vendor.DisplayName == "New Vendor Invoice Template") AddNewTemplate();
             else
             {
 
@@ -165,12 +162,12 @@ namespace WpfOcrInvoiceExtractor
                     templateDisplay.StreamSource = memoryStream;
                     templateDisplay.EndInit();
                     
-                    regionViewer = new RegionViewer(templateViewer.imageRegions);
+                    regionViewer = new RegionViewer(templateViewer.imageRegions, this.invoiceTemplates.Select(it => it.Vendor.Id).ToList());
                     bool? regionViewerResult = regionViewer.ShowDialog();
 
                     if (regionViewerResult == true) {
 
-                        InvoiceTemplate template = new() { ImageRegions = regionViewer.imageSources, Vendor = new Vendor(), Display = templateDisplay };
+                        InvoiceTemplate template = new() { ImageRegions = regionViewer.imageSources, Vendor = regionViewer.selectedVendor, Display = templateDisplay };
                         WriteTemplateToData(template);
                     }
                     memoryStream.Close();
@@ -185,7 +182,15 @@ namespace WpfOcrInvoiceExtractor
 
         private void Delete_Template(object sender, RoutedEventArgs e)
         {
-
+            string localDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            if (!Directory.Exists($"{localDataPath}\\QBO_Invoice_Parser"))
+            {
+                Directory.CreateDirectory($"{localDataPath}\\QBO_Invoice_Parser");
+                return;
+            }
+            InvoiceTemplate template = (InvoiceTemplate)(sender as Button).DataContext;
+            File.Delete($"{localDataPath}\\QBO_Invoice_Parser\\template_{template.Vendor.DisplayName}_{template.Vendor.Id}.xml");
+            invoiceTemplates.Remove(template);
         }
     }
 }

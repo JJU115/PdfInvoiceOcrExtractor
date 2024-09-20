@@ -22,9 +22,13 @@ namespace WpfOcrInvoiceExtractor
         TesseractEngine engine = new TesseractEngine("./tessdata", "eng");
         public List<ImageRegion> imageSources = new List<ImageRegion>();
         public Vendor selectedVendor;
+        public List<string> existingVendors = new List<string>();
+        public string vendorOCRResult = "";
         int focusedRegion;
 
-        public RegionViewer(List<ImageRegion> regions)
+        public Dictionary<int, BillTopic> billTopicDict;// = new Dictionary<int, BillTopic>();
+
+        public RegionViewer(List<ImageRegion> regions, List<string> existingVendors)
         {
             InitializeComponent();
             this.DataContext = this;
@@ -36,6 +40,12 @@ namespace WpfOcrInvoiceExtractor
             ImageEditorControl.ImageBitmap = new WriteableBitmap(imageSources[0].Image);
             focusedRegion = 0;
             ((RegionDataTemplateSelector)this.Resources["RegionDataTemplateSelector"]).SelectedIndex = 0;
+            this.existingVendors = existingVendors;
+            
+            billTopicDict = new()
+            {
+                { 0, BillTopic.Amount }
+            };
         }
 
         private void regionClicked(object sender, MouseButtonEventArgs e) {
@@ -46,6 +56,7 @@ namespace WpfOcrInvoiceExtractor
             regionList.ItemTemplateSelector = selector;
             ImageEditorControl.Invoice_SourceUpdated(new WriteableBitmap(imageSources[rgn.Index].Image));
             this.focusedRegion = rgn.Index;
+            this.billTopics.SelectedIndex = (int)imageSources[focusedRegion].BillTopic;
         }
 
         private void runOCRTestOnCurrent(object sender, RoutedEventArgs e)
@@ -55,26 +66,44 @@ namespace WpfOcrInvoiceExtractor
                 BitmapEncoder enc = new BmpBitmapEncoder();
                 enc.Frames.Add(BitmapFrame.Create(this.imageSources[this.focusedRegion].Image));
                 enc.Save(outStream);
-                Bitmap bitmap = new(outStream);
-
-                var page = engine.Process(new Bitmap(bitmap));
-                Debug.WriteLine($"{page.GetText()}");
-                page.Dispose();
+                runOCREngine(Pix.LoadFromMemory(outStream.ToArray()));
             }
+        }
+
+        private string runOCREngine(Pix pix)
+        {
+            var page = engine.Process(pix);
+            string ocr = page.GetText();
+            Debug.WriteLine($"{ocr}");
+            page.Dispose();
+            return ocr;
         }
 
         private async void SaveRegions_Click(object sender, RoutedEventArgs e)
         {
             List<Vendor> vendors = await QBOUtility.GetVendorList();
             //Dialog to get user to select a vendor
-            VendorSelectDialog vsd = new VendorSelectDialog(vendors);
-            bool? vendorResult = vsd.ShowDialog();
+            VendorSelectDialog vsd = new VendorSelectDialog(vendors.Where(v => !existingVendors.Contains(v.Id)).ToList());
+            bool? vendorResult = vsd.ShowDialog();          
             if (vendorResult == true) {
                 this.selectedVendor = (Vendor)vsd.vendorBox.SelectedItem;
+                ImageRegion vendImg = imageSources.Find(iSrc => iSrc.BillTopic == BillTopic.Vendor)!; //Check if user has defined vendor image
+                using (MemoryStream outStream = new())
+                {
+                    BitmapEncoder enc = new BmpBitmapEncoder();
+                    enc.Frames.Add(BitmapFrame.Create(vendImg.Image));
+                    enc.Save(outStream);
+                    this.vendorOCRResult = runOCREngine(Pix.LoadFromMemory(outStream.ToArray())).Trim();
+                }
                 DialogResult = true;
                 Close();
-            }
-            
+            }          
+        }
+
+        private void billTopics_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var selectedTopic = (sender as ComboBox).SelectedIndex;
+            imageSources[focusedRegion].BillTopic = (BillTopic)selectedTopic;
         }
     }
 
