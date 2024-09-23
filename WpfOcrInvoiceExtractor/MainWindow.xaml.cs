@@ -19,6 +19,7 @@ using UglyToad.PdfPig.Content;
 using Tabula.Detectors;
 using Tabula.Extractors;
 using Tabula;
+using Tesseract;
 
 
 namespace WpfOcrInvoiceExtractor
@@ -85,7 +86,7 @@ namespace WpfOcrInvoiceExtractor
                 {
                     Id = "58"
                 };
-               await QBOUtility.CreateNewBillToQbo(regionList, wesco, new BitmapImage());
+               await QBOUtility.CreateNewBillToQbo(regionList, wesco);
             } else if (e.Key == Key.L)
             {
                 this.RetrieveTemplateData();
@@ -106,6 +107,7 @@ namespace WpfOcrInvoiceExtractor
             {
                 FileStream fs = new FileStream(f, FileMode.Open);
                 InvoiceTemplate it = (InvoiceTemplate)serializer.Deserialize(fs);
+                it.ImageRegions.ForEach(ir => ir.Image = new CroppedBitmap(it.Display, ir.SourceRegion));
                 it.Display.DecodePixelHeight = 200;
                 return it;
             });
@@ -200,7 +202,7 @@ namespace WpfOcrInvoiceExtractor
             invoiceTemplates.Remove(template);
         }
 
-        private void NewImportButton_Click(object sender, RoutedEventArgs e)
+        private async void NewImportButton_Click(object sender, RoutedEventArgs e)
         {
             OpenFileDialog openFileDialog = new OpenFileDialog();
             openFileDialog.Multiselect = true;
@@ -214,9 +216,16 @@ namespace WpfOcrInvoiceExtractor
                 List<ImageRegion> vendorRegions = invoiceTemplates.Select(temp => temp.ImageRegions.First(reg => reg.BillTopic == BillTopic.Vendor)).ToList();
 
                 foreach (Bitmap bmp in pdfImages) {
-                    //For the vendor regions of each template, run ocr
-                    //The template for which the ocr returns a string equal to the vendorOcr saved in the imageRegion is the template to use
-                    //Just call QBOUtility.CreateNewBillToQbo(); with adequate logging/progress indication (to be added)
+
+                    var templateMatch = invoiceTemplates.First(template =>
+                    {
+                        var vendorReg = template.ImageRegions.Find(reg => reg.BillTopic == BillTopic.Vendor)!.SourceRegion;
+                        var page = QBOUtility.engine.Process(bmp, new Tesseract.Rect(vendorReg.X, vendorReg.Y, vendorReg.Width, vendorReg.Height));
+                        string ocr = page.GetText().Trim();
+                        return ocr == template.VendorOCRResult;
+                    });
+
+                    await QBOUtility.CreateNewBillToQbo(templateMatch);
                 }
                 
             }

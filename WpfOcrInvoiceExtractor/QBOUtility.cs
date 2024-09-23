@@ -160,7 +160,7 @@ namespace WpfOcrInvoiceExtractor
             return bill;
         }
 
-        public static async Task<bool> CreateNewBillToQbo(List<ImageRegion> imageRegions, Vendor vendor)
+        public static async Task<bool> CreateNewBillToQbo(InvoiceTemplate invoiceTemplate)
         {
             //Check the tokens, if authentication failed for any reason, end and return false
             if (!await CheckTokens()) return false;
@@ -198,13 +198,13 @@ namespace WpfOcrInvoiceExtractor
                 }
              */
 
-            Bill billToSend = ResolveOnImageRegions(imageRegions);
+            Bill billToSend = ResolveOnImageRegions(invoiceTemplate.ImageRegions);
 
             var billObject = new
             {
                 Line = new[] {
                 new {DetailType = "AccountBasedExpenseLineDetail", Amount = 768.33, Id = "1", AccountBasedExpenseLineDetail = new {AccountRef = new {value = "7"}}}},
-                VendorRef = new { value = vendor.Id, name = vendor.DisplayName }
+                VendorRef = new { value = invoiceTemplate.Vendor.Id, name = invoiceTemplate.Vendor.DisplayName }
             };
 
 

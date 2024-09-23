@@ -19,7 +19,6 @@ namespace WpfOcrInvoiceExtractor
     /// </summary>
     public partial class RegionViewer : Window
     {
-        TesseractEngine engine = new TesseractEngine("./tessdata", "eng");
         public List<ImageRegion> imageSources = new List<ImageRegion>();
         public Vendor selectedVendor;
         public List<string> existingVendors = new List<string>();
@@ -65,7 +64,7 @@ namespace WpfOcrInvoiceExtractor
 
         private string runOCREngine(Pix pix)
         {
-            var page = engine.Process(pix);
+            var page = QBOUtility.engine.Process(pix);
             string ocr = page.GetText();
             Debug.WriteLine($"{ocr}");
             page.Dispose();
