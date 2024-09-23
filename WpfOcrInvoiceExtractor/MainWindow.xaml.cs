@@ -13,6 +13,12 @@ using System.Collections.ObjectModel;
 using System.Windows.Media;
 using System.Linq;
 using System.Diagnostics;
+using UglyToad.PdfPig;
+using System.Xml.Linq;
+using UglyToad.PdfPig.Content;
+using Tabula.Detectors;
+using Tabula.Extractors;
+using Tabula;
 
 
 namespace WpfOcrInvoiceExtractor
@@ -79,7 +85,7 @@ namespace WpfOcrInvoiceExtractor
                 {
                     Id = "58"
                 };
-               await QBOUtility.CreateNewBillToQbo(regionList, wesco);
+               await QBOUtility.CreateNewBillToQbo(regionList, wesco, new BitmapImage());
             } else if (e.Key == Key.L)
             {
                 this.RetrieveTemplateData();
@@ -149,6 +155,7 @@ namespace WpfOcrInvoiceExtractor
                 templateViewer = new InvoiceTemplateViewer(openFileDialog.FileName);
                 bool? viewerResult = templateViewer.ShowDialog();
 
+
                 if (viewerResult == true) {
                     JpegBitmapEncoder encoder = new();
                     MemoryStream memoryStream = new();
@@ -161,13 +168,13 @@ namespace WpfOcrInvoiceExtractor
                     templateDisplay.BeginInit();
                     templateDisplay.StreamSource = memoryStream;
                     templateDisplay.EndInit();
-                    
+
                     regionViewer = new RegionViewer(templateViewer.imageRegions, this.invoiceTemplates.Select(it => it.Vendor.Id).ToList());
                     bool? regionViewerResult = regionViewer.ShowDialog();
 
                     if (regionViewerResult == true) {
 
-                        InvoiceTemplate template = new() { ImageRegions = regionViewer.imageSources, Vendor = regionViewer.selectedVendor, Display = templateDisplay };
+                        InvoiceTemplate template = new() { ImageRegions = regionViewer.imageSources, Vendor = regionViewer.selectedVendor, VendorOCRResult = regionViewer.vendorOCRResult, Display = templateDisplay };
                         WriteTemplateToData(template);
                     }
                     memoryStream.Close();
@@ -191,6 +198,45 @@ namespace WpfOcrInvoiceExtractor
             InvoiceTemplate template = (InvoiceTemplate)(sender as Button).DataContext;
             File.Delete($"{localDataPath}\\QBO_Invoice_Parser\\template_{template.Vendor.DisplayName}_{template.Vendor.Id}.xml");
             invoiceTemplates.Remove(template);
+        }
+
+        private void NewImportButton_Click(object sender, RoutedEventArgs e)
+        {
+            OpenFileDialog openFileDialog = new OpenFileDialog();
+            openFileDialog.Multiselect = true;
+            openFileDialog.Filter = "PDF Files|*.pdf";
+
+            bool? result = openFileDialog.ShowDialog();
+
+            if (result == true)
+            {
+                List<Bitmap> pdfImages = ConvertPdfsToImages(openFileDialog.FileNames);
+                List<ImageRegion> vendorRegions = invoiceTemplates.Select(temp => temp.ImageRegions.First(reg => reg.BillTopic == BillTopic.Vendor)).ToList();
+
+                foreach (Bitmap bmp in pdfImages) {
+                    //For the vendor regions of each template, run ocr
+                    //The template for which the ocr returns a string equal to the vendorOcr saved in the imageRegion is the template to use
+                    //Just call QBOUtility.CreateNewBillToQbo(); with adequate logging/progress indication (to be added)
+                }
+                
+            }
+        }
+
+        public List<Bitmap> ConvertPdfsToImages(string[] filePaths)
+        {
+            int desired_dpi = 300;
+            List<Bitmap> pdfImages = new List<Bitmap>();
+
+            using (var rasterizer = new GhostscriptRasterizer())
+            {
+                foreach (string path in filePaths)
+                {
+                    rasterizer.Open(path);
+                    var img = rasterizer.GetPage(desired_dpi, 1);
+                    pdfImages.Add(new Bitmap(img));
+                }
+            }
+            return pdfImages;
         }
     }
 }

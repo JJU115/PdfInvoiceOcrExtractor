@@ -51,7 +51,8 @@
             </StackPanel>
             <uc:ImageEditor x:Name="ImageEditorControl" ScalingMode="Horizontal" Drawable="False" Grid.Row="1"></uc:ImageEditor>
             <StackPanel Orientation="Horizontal" Margin="0,0,0,0" Grid.Row="2">
-                <ComboBox Name="billTopics" SelectionChanged="billTopics_SelectionChanged">
+                <ComboBox Name="billTopics"  SelectionChanged="billTopics_SelectionChanged">
+                    <ComboBoxItem>-- Select --</ComboBoxItem>
                     <ComboBoxItem>Total Amount</ComboBoxItem>
                     <ComboBoxItem>Invoice Date</ComboBoxItem>
                     <ComboBoxItem>Invoice Number</ComboBoxItem>

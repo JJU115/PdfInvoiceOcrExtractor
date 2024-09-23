@@ -15,7 +15,7 @@
         </Grid.RowDefinitions>
 
         <StackPanel Orientation="Horizontal" Margin="0,0,0,20" Grid.Row="0">
-            <Button Name="NewImportButton">New Import</Button>
+            <Button Name="NewImportButton" Click="NewImportButton_Click">New Import</Button>
             <Button>Settings</Button>
         </StackPanel>
 

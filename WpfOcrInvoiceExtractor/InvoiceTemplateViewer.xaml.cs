@@ -74,7 +74,7 @@ namespace WpfOcrInvoiceExtractor
             int index = 0;
             foreach (var region in ImageEditorControl.RegionsSource) {
                 CroppedBitmap cropped = new(ImageEditorControl.ImageBitmap, region);
-                imageRegions.Add(new() { Image = cropped, Name="", Index=index++ });
+                imageRegions.Add(new() { Image = cropped, SourceRegion = region, Index=index++ });
             }
             DialogResult = true;
             Close();           

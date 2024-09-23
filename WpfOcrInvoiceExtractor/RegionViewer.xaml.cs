@@ -26,8 +26,6 @@ namespace WpfOcrInvoiceExtractor
         public string vendorOCRResult = "";
         int focusedRegion;
 
-        public Dictionary<int, BillTopic> billTopicDict;// = new Dictionary<int, BillTopic>();
-
         public RegionViewer(List<ImageRegion> regions, List<string> existingVendors)
         {
             InitializeComponent();
@@ -41,11 +39,6 @@ namespace WpfOcrInvoiceExtractor
             focusedRegion = 0;
             ((RegionDataTemplateSelector)this.Resources["RegionDataTemplateSelector"]).SelectedIndex = 0;
             this.existingVendors = existingVendors;
-            
-            billTopicDict = new()
-            {
-                { 0, BillTopic.Amount }
-            };
         }
 
         private void regionClicked(object sender, MouseButtonEventArgs e) {
@@ -81,6 +74,21 @@ namespace WpfOcrInvoiceExtractor
 
         private async void SaveRegions_Click(object sender, RoutedEventArgs e)
         {
+            //There must be a better way of doing this...
+            bool amountSelected = imageSources.Where(img => img.BillTopic == BillTopic.Amount).Any();
+            bool dateSelected = imageSources.Where(img => img.BillTopic == BillTopic.BillDate).Any();
+            bool numberSelected = imageSources.Where(img => img.BillTopic == BillTopic.BillNumber).Any();
+            bool vendorSelected = imageSources.Where(img => img.BillTopic == BillTopic.Vendor).Any();
+            bool tableSelected = imageSources.Where(img => img.BillTopic == BillTopic.ItemsTable).Any();
+
+            if (!amountSelected && !dateSelected && !numberSelected && !vendorSelected && !tableSelected)
+            {
+                MessageBox.Show("Missing bill topic assignment", "Missing assignments", MessageBoxButton.OK, MessageBoxImage.Information, MessageBoxResult.OK);
+                return;
+            }
+
+            //What if multiple images have the same bill topic?
+
             List<Vendor> vendors = await QBOUtility.GetVendorList();
             //Dialog to get user to select a vendor
             VendorSelectDialog vsd = new VendorSelectDialog(vendors.Where(v => !existingVendors.Contains(v.Id)).ToList());
@@ -97,7 +105,8 @@ namespace WpfOcrInvoiceExtractor
                 }
                 DialogResult = true;
                 Close();
-            }          
+            }
+            
         }
 
         private void billTopics_SelectionChanged(object sender, SelectionChangedEventArgs e)
