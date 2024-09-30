@@ -86,7 +86,7 @@ namespace WpfOcrInvoiceExtractor
                 {
                     Id = "58"
                 };
-               await QBOUtility.CreateNewBillToQbo(regionList, wesco);
+               //await QBOUtility.CreateNewBillToQbo(new InvoiceTemplate());
             } else if (e.Key == Key.L)
             {
                 this.RetrieveTemplateData();
@@ -213,21 +213,35 @@ namespace WpfOcrInvoiceExtractor
             if (result == true)
             {
                 List<Bitmap> pdfImages = ConvertPdfsToImages(openFileDialog.FileNames);
-                List<ImageRegion> vendorRegions = invoiceTemplates.Select(temp => temp.ImageRegions.First(reg => reg.BillTopic == BillTopic.Vendor)).ToList();
+                List<string> failed = new(openFileDialog.FileNames);
 
-                foreach (Bitmap bmp in pdfImages) {
+                for (int b=0; b<pdfImages.Count; b++) {
+                    Bitmap bmp = pdfImages[b];
+                    InvoiceTemplate? templateMatch = null;
 
-                    var templateMatch = invoiceTemplates.First(template =>
+                    foreach (InvoiceTemplate template in invoiceTemplates.Skip(1))
                     {
                         var vendorReg = template.ImageRegions.Find(reg => reg.BillTopic == BillTopic.Vendor)!.SourceRegion;
                         var page = QBOUtility.engine.Process(bmp, new Tesseract.Rect(vendorReg.X, vendorReg.Y, vendorReg.Width, vendorReg.Height));
                         string ocr = page.GetText().Trim();
-                        return ocr == template.VendorOCRResult;
-                    });
+                        page.Dispose();
+                        if (ocr == template.VendorOCRResult)
+                        {
+                            templateMatch = template;
+                            break;
+                        }
+                    }
 
-                    await QBOUtility.CreateNewBillToQbo(templateMatch);
+                    if (templateMatch != null)
+                    {
+                        ImageRegion tableRegion = templateMatch.ImageRegions.Find(ir => ir.BillTopic == BillTopic.ItemsTable)!;
+                        failed.RemoveAt(b - (pdfImages.Count - failed.Count));
+                        await QBOUtility.CreateNewBillToQbo(bmp, templateMatch!); //Return a enum? Success, tax mismatch, failed to send...
+                    }
                 }
-                
+
+                if (failed.Count > 0)
+                    MessageBox.Show($"Could not detect a saved template for the following files:\n{failed.Aggregate((acc, curr) => $"{acc}{curr}\n")}", "Invoices failed to process", MessageBoxButton.OK, MessageBoxImage.Information, MessageBoxResult.OK);
             }
         }
 

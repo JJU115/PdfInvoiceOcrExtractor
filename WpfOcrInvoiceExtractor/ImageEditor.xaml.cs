@@ -1,20 +1,9 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Diagnostics;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
 using System.Windows.Shapes;
 
 namespace WpfOcrInvoiceExtractor
@@ -27,7 +16,7 @@ namespace WpfOcrInvoiceExtractor
 
         public WriteableBitmap ImageBitmap { get; set; }
 
-        public List<Int32Rect> RegionsSource = new List<Int32Rect>();
+        public List<Int32Rect> RegionsSource = [];
         public string ScalingMode { get; set; }
         public bool Drawable { get; set; }
 
@@ -58,13 +47,22 @@ namespace WpfOcrInvoiceExtractor
             this.disableUpPanning = false;
         }
 
-        public void Invoice_SourceUpdated(WriteableBitmap wb)
+        public void Invoice_SourceUpdated(WriteableBitmap wb, bool maintainOrientation = false)
         {
+            MatrixTransform mt = invoice.RenderTransform as MatrixTransform;
             invoice.Source = this.ImageBitmap = wb;
-            Matrix mtx = new Matrix(this.ActualWidth / wb.Width, 0, 0, this.ActualWidth / wb.Width, 0, 0);
-            baseScale = mtx.M11;
-            invoice.RenderTransform = new MatrixTransform(mtx);
-            Canvas.SetTop(invoice, (this.ActualHeight - (mtx.M22 * wb.Height)) / 2);
+            if (maintainOrientation)
+            {
+                invoice.RenderTransform = mt;
+                
+            } else
+            {
+                Matrix mtx = new Matrix(this.ActualWidth / wb.Width, 0, 0, this.ActualWidth / wb.Width, 0, 0);
+                baseScale = mtx.M11;
+                invoice.RenderTransform = new MatrixTransform(mtx);
+                Canvas.SetTop(invoice, (this.ActualHeight - (mtx.M22 * wb.Height)) / 2);
+            }
+            
         }
 
         private void Control_Loaded(object sender, RoutedEventArgs e)

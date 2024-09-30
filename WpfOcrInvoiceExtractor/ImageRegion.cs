@@ -17,7 +17,8 @@ namespace WpfOcrInvoiceExtractor
         Category,
         Class,
         Description,
-        SalesTax,        
+        GSTDeterminant, //Only for those where GST/PST is not inferred from items table
+        PSTDeterminant
     }
 
     public class ImageRegion
