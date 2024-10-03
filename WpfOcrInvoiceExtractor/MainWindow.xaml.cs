@@ -1,7 +1,6 @@
 ﻿using System.Drawing;
 using System.Windows;
 using System.Windows.Input;
-using System.Windows.Interop;
 using System.Windows.Media.Imaging;
 using Ghostscript.NET.Rasterizer;
 using System.IO;
@@ -10,15 +9,7 @@ using System.Xml.Serialization;
 using Microsoft.Win32;
 using System.Windows.Controls;
 using System.Collections.ObjectModel;
-using System.Windows.Media;
-using System.Linq;
 using System.Diagnostics;
-using UglyToad.PdfPig;
-using System.Xml.Linq;
-using UglyToad.PdfPig.Content;
-using Tabula.Detectors;
-using Tabula.Extractors;
-using Tabula;
 using Tesseract;
 
 
@@ -34,7 +25,7 @@ namespace WpfOcrInvoiceExtractor
         RegionViewer? regionViewer;
 
         public MainWindow()
-        {           
+        {
             InitializeComponent();
             this.DataContext = this;
 
@@ -57,6 +48,10 @@ namespace WpfOcrInvoiceExtractor
              * 4. Pull stored image regions from template and pass them to process method
              * 5. Process method return Bill object, pass that and vendor id to upload method
              */
+            if (e.Key == Key.K)
+            {
+                KickServUtility.GetJobs();
+            }
 
             //Store files of template data in this path
             if (e.Key == Key.I) {

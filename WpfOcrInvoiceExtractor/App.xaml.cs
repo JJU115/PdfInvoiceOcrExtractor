@@ -1,5 +1,4 @@
-﻿using System.Configuration;
-using System.Data;
+﻿using System.Net;
 using System.Windows;
 
 namespace WpfOcrInvoiceExtractor
@@ -9,6 +8,10 @@ namespace WpfOcrInvoiceExtractor
     /// </summary>
     public partial class App : Application
     {
+        public App()
+        {
+            System.Net.ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls13;
+        }
     }
 
 }
