@@ -59,7 +59,7 @@ namespace WpfOcrInvoiceExtractor
 
             HttpResponseMessage response = await StaticClient.SendAsync(requestMessage);
             string jobType = await response.Content.ReadAsStringAsync();
-            return jobType;
+            return jobType.Trim().ToUpper();
         }
     }
 }

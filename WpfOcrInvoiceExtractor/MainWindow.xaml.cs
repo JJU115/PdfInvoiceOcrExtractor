@@ -207,6 +207,11 @@ namespace WpfOcrInvoiceExtractor
 
             if (result == true)
             {
+                //These will all be grouped into one method later
+                await QBOUtility.PopulateAccountsList();
+                await QBOUtility.PopulateQBOClassList();
+                await QBOUtility.PopulateQBOTaxCodesList();
+
                 List<Bitmap> pdfImages = ConvertPdfsToImages(openFileDialog.FileNames);
                 List<string> failed = new(openFileDialog.FileNames);
 

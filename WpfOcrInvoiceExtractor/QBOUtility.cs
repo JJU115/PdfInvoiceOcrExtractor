@@ -123,12 +123,7 @@ namespace WpfOcrInvoiceExtractor
                     case BillTopic.BillNumber:
                         bill.DocNumber = page.GetText().Trim(); //Remove all non numeric characters
                         break;
-                    case BillTopic.Category:
-                        lineDetail.AccountRef = new ReferenceType(); //Inferred somehow
-                        break;
-                    case BillTopic.Class:
-                        lineDetail.ClassRef = new ReferenceType(); //Inferred somehow
-                        break;
+
                 }
 
                 page.Dispose();
@@ -195,6 +190,16 @@ namespace WpfOcrInvoiceExtractor
             (Bill billToSend, InvoiceItemsTable itemsTable) = ResolveOnImageRegions(invoiceImage, invoiceTemplate.ImageRegions);
             itemsTable.PreTaxSubtotal = Math.Round(itemsTable.PreTaxSubtotal, 2);
 
+            //Get the Work order number or PO number
+            ImageRegion WORegion = invoiceTemplate.ImageRegions.Find(ir => ir.BillTopic == BillTopic.WONumber)!;
+            Page page = engine.Process(invoiceImage,
+                    new Tesseract.Rect(WORegion.SourceRegion.X, WORegion.SourceRegion.Y, WORegion.SourceRegion.Width, WORegion.SourceRegion.Height));
+            string jobType = await KickServUtility.GetJobType(page.GetText().Trim());
+
+            //Highly customized to Wesco right now
+            string billAccount = jobType == "EV-CHARGERS" ? "91" : "92";
+            string billClass = jobType == "SERVICE" ? "533420" :"533421";
+
             var billObject = new
             {
                 billToSend.TxnDate,
@@ -206,8 +211,8 @@ namespace WpfOcrInvoiceExtractor
                     DetailType = "AccountBasedExpenseLineDetail", 
                     Amount = billToSend.TotalAmt, 
                     AccountBasedExpenseLineDetail = new {
-                        AccountRef = new {value = "7"},  
-                        ClassRef = new {value = 1}, 
+                        AccountRef = new {value = billAccount},  
+                        ClassRef = new {value = billClass}, 
                         TaxCodeRef = new {value = 1}, //Probably correct, double check
                         TaxAmount = Math.Round((double)billToSend.TotalAmt - itemsTable.PreTaxSubtotal, 2), //Very likely wrong, need to see 
                     },
@@ -294,7 +299,7 @@ namespace WpfOcrInvoiceExtractor
 
         public static void ReadTokensFromJson()
         {
-            FileInfo fi = new FileInfo(".\\Tokens.json");
+            FileInfo fi = new(".\\Tokens.json");
             if (fi.Exists)
             {
                 Tokens = JsonConvert.DeserializeObject<QboAuthTokens>(File.ReadAllText(".\\Tokens.json"), new JsonSerializerSettings
@@ -338,7 +343,7 @@ namespace WpfOcrInvoiceExtractor
 
         //All the following can be grouped into one method with generics and reflection
 
-        static List<Vendor> CachedVendorList = new List<Vendor>();
+        static List<Vendor> CachedVendorList = [];
 
         public static async Task<List<Vendor>> GetVendorList() {
             StaticClient ??= new HttpClient();
@@ -364,14 +369,41 @@ namespace WpfOcrInvoiceExtractor
             return CachedVendorList;
         }
 
-        static List<Class> CachedClassList = new List<Class>();
+        static List<Account> CachedAccountList = [];
 
-        public async static Task<List<Class>> GetQBOClassList()
+        public async static Task<bool> PopulateAccountsList()
         {
             StaticClient ??= new HttpClient();
 
-            if (!await CheckTokens()) return [];
-            if (CachedClassList.Count > 0) return CachedClassList;
+            if (!await CheckTokens()) return false;
+            if (CachedAccountList.Count > 0) return false;
+
+            string url = $"{BASE_URL}/v3/company/{Tokens!.RealmId}/query?query=select Name, Id from Account";
+
+            HttpRequestMessage requestMessage = new HttpRequestMessage(HttpMethod.Get, url);
+            requestMessage.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("bearer", Tokens.AccessToken);
+
+            if (!StaticClient.DefaultRequestHeaders.Any(rh => rh.Value.Contains("application/json") && rh.Key == "Accept"))
+                StaticClient.DefaultRequestHeaders.Add("Accept", "application/json");
+
+            HttpResponseMessage response = await StaticClient.SendAsync(requestMessage);
+
+            JObject QueryResponse = JObject.Parse(await response.Content.ReadAsStringAsync());
+            JArray accounts = (JArray)QueryResponse["QueryResponse"]["Account"];
+
+            CachedAccountList = accounts.Select(QboAccount => new Class() { Name = (string)QboAccount["Name"], Id = (string)QboAccount["Id"] }).ToList();
+            return true;
+        }
+
+
+        static List<Class> CachedClassList = [];
+
+        public async static Task<bool> PopulateQBOClassList()
+        {
+            StaticClient ??= new HttpClient();
+
+            if (!await CheckTokens()) return false;
+            if (CachedClassList.Count > 0) return false;
 
             string url = $"{BASE_URL}/v3/company/{Tokens!.RealmId}/query?query=select Name, Id from Class";
 
@@ -387,18 +419,17 @@ namespace WpfOcrInvoiceExtractor
             JArray classes = (JArray)QueryResponse["QueryResponse"]["Class"];
 
             CachedClassList = classes.Select(QboClass => new Class() { Name = (string)QboClass["Name"], Id = (string)QboClass["Id"] }).ToList();
-            return CachedClassList;
+            return true;
         }
-
 
         static List<TaxCode> CachedTaxCodeList = [];
 
-        public async static Task<List<TaxCode>> GetQBOTaxCodesList()
+        public async static Task<bool> PopulateQBOTaxCodesList()
         {
             StaticClient ??= new HttpClient();
 
-            if (!await CheckTokens()) return [];
-            if (CachedTaxCodeList.Count > 0) return CachedTaxCodeList;
+            if (!await CheckTokens()) return false;
+            if (CachedTaxCodeList.Count > 0) return false;
 
             string url = $"{BASE_URL}/v3/company/{Tokens!.RealmId}/query?query=select Name, Id from TaxCode";
 
@@ -414,7 +445,7 @@ namespace WpfOcrInvoiceExtractor
             JArray taxCodes = (JArray)QueryResponse["QueryResponse"]["TaxCode"];
 
             CachedTaxCodeList = taxCodes.Select(taxCode => new TaxCode() { Name = (string)taxCode["Name"], Id = (string)taxCode["Id"] }).ToList();
-            return CachedTaxCodeList;
+            return true;
         }
 
     }
