@@ -3,10 +3,7 @@ using Newtonsoft.Json;
 using System.IO;
 using System.Net.Http;
 using System.Windows;
-using System.Diagnostics;
 using System.Text.Json;
-using System.Windows.Shapes;
-using System.Net;
 
 namespace WpfOcrInvoiceExtractor
 {
@@ -18,7 +15,7 @@ namespace WpfOcrInvoiceExtractor
 
     class KickServUtility
     {
-        public static readonly string KICKSERV_URL = "https://app.kickserv.com";
+        public static readonly string FUNCTION_URL = "https://kickservclient.azurewebsites.net/api/GetKickServJobType?code=l4lJSiPkzDySX2EcRlRzOjqrP-ASoi0HTaLcXMFeY94OAzFuNQRMfA%3D%3D";
         public static KickServAuth? KickServAuth = null;
         private static HttpClient? StaticClient = null;
 
@@ -51,33 +48,18 @@ namespace WpfOcrInvoiceExtractor
             }
         }
 
-
-        public async static void GetJobs()
+        //For now one job type at a time, can batch this up
+        public async static Task<string> GetJobType(string jobNumber)
         {
             if (KickServAuth == null) GetAuthDetails();
             StaticClient ??= new HttpClient();
-            StaticClient.DefaultRequestHeaders.Add("accept", "application/xml");
 
-
-            using (var client = new HttpClient())
-            {
-                string url = $"{KICKSERV_URL}/{KickServAuth!.KickservAccount}/jobs.xml";
-                HttpRequestMessage requestMessage = new(HttpMethod.Get, url);
-                //requestMessage.Version = HttpVersion.Version20;
-                requestMessage.Headers.Authorization = new BasicAuthenticationHeaderValue(KickServAuth.KickservToken!, KickServAuth.KickservToken!);
-
-                HttpResponseMessage response = await client.SendAsync(requestMessage);
-                Debug.WriteLine($"{await response.Content.ReadAsStringAsync()}");
-            }
-
-/*
-            string url = $"{KICKSERV_URL}/{KickServAuth!.KickservAccount}/jobs.xml";
+            string url = $"{FUNCTION_URL}&APIToken={KickServAuth!.KickservToken}&SLUG={KickServAuth.KickservAccount}&jobNumber={jobNumber}";
             HttpRequestMessage requestMessage = new(HttpMethod.Get, url);
-            requestMessage.Version = HttpVersion.Version20;
-            requestMessage.Headers.Authorization = new BasicAuthenticationHeaderValue(KickServAuth.KickservToken!, KickServAuth.KickservToken!);
 
             HttpResponseMessage response = await StaticClient.SendAsync(requestMessage);
-            Debug.WriteLine($"{await response.Content.ReadAsStringAsync()}");*/
+            string jobType = await response.Content.ReadAsStringAsync();
+            return jobType;
         }
     }
 }

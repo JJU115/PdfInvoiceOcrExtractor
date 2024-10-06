@@ -208,10 +208,13 @@ namespace WpfOcrInvoiceExtractor
                     AccountBasedExpenseLineDetail = new {
                         AccountRef = new {value = "7"},  
                         ClassRef = new {value = 1}, 
-                        TaxCodeRef = new {value = 1},
-                        TaxAmount = Math.Round((double)billToSend.TotalAmt - itemsTable.PreTaxSubtotal, 2),
+                        TaxCodeRef = new {value = 1}, //Probably correct, double check
+                        TaxAmount = Math.Round((double)billToSend.TotalAmt - itemsTable.PreTaxSubtotal, 2), //Very likely wrong, need to see 
                     },
                 }},
+                TxnTaxDetail = new { 
+                    //To fill out
+                },
                 VendorRef = new { value = invoiceTemplate.Vendor.Id, name = invoiceTemplate.Vendor.DisplayName },
             };
             

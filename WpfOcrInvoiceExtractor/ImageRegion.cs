@@ -14,6 +14,7 @@ namespace WpfOcrInvoiceExtractor
         BillNumber,
         Vendor,
         ItemsTable,
+        WONumber,
         Category,
         Class,
         Description,

@@ -18,55 +18,29 @@ namespace KickServFunction
         static HttpClient StaticClient = new HttpClient();
         public static readonly string KICKSERV_URL = "https://app.kickserv.com";
 
-        [FunctionName("GetAllKickServJobs")]
-        public static async Task<IActionResult> GetAllKickServJobs(
-            [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequest req,
-            ILogger log)
-        {
-            log.LogInformation("Getting all jobs...");
-
-            string token = Environment.GetEnvironmentVariable("AuthToken");
-            string SLUG = Environment.GetEnvironmentVariable("KickServSLUG");
-
-            StaticClient.DefaultRequestHeaders.Add("accept", "application/xml");
-
-            string url = $"{KICKSERV_URL}/{SLUG}/jobs.xml";
-            string base64Auth = Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes($"{token}:{token}"));
-
-            HttpRequestMessage requestMessage = new(HttpMethod.Get, url);
-            requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Basic", base64Auth);
-
-            HttpResponseMessage response = await StaticClient.SendAsync(requestMessage);
-            String content = await response.Content.ReadAsStringAsync();
-            Debug.WriteLine($"{content}");
-
-            return new OkObjectResult(content);
-        }
-
-
-        [FunctionName("GetKickServJobFromJobNumber")]
+        [FunctionName("GetKickServJobType")]
         public static async Task<IActionResult> GetKickServJobFromJobNumber(
             [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequest req,
             ILogger log)
         {
-            string jobNumber = req.Query["jobNumber"].ToString();
-
-            string token = Environment.GetEnvironmentVariable("AuthToken");
-            string SLUG = Environment.GetEnvironmentVariable("KickServSLUG");
+            string apiToken = req.Query["APIToken"];
+            string accountSLUG = req.Query["SLUG"];
+            string jobNumber = req.Query["jobNumber"];
 
             StaticClient.DefaultRequestHeaders.Add("accept", "application/xml");
 
-            string url = $"{KICKSERV_URL}/{SLUG}/jobs/{jobNumber}.xml";
-            string base64Auth = Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes($"{token}:{token}"));
+            string url = $"{KICKSERV_URL}/{accountSLUG}/jobs/{jobNumber}.xml";
+            string base64Auth = Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes($"{apiToken}:{apiToken}"));
 
             HttpRequestMessage requestMessage = new(HttpMethod.Get, url);
             requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Basic", base64Auth);
 
             HttpResponseMessage response = await StaticClient.SendAsync(requestMessage);
-            String content = await response.Content.ReadAsStringAsync();
-            Debug.WriteLine($"{content}");
+            string content = await response.Content.ReadAsStringAsync();
 
-            return new OkObjectResult(content);
+            string typeName = content[(content.IndexOf("<name>") + 6)..content.IndexOf("</name>")];
+
+            return new OkObjectResult(typeName.Trim());
         }
     }
 }

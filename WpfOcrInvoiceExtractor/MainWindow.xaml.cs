@@ -50,7 +50,7 @@ namespace WpfOcrInvoiceExtractor
              */
             if (e.Key == Key.K)
             {
-                KickServUtility.GetJobs();
+                await KickServUtility.GetJobType("20005");
             }
 
             //Store files of template data in this path
