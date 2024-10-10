@@ -4,7 +4,6 @@ using System.Text.Json;
 using System.Collections.Specialized;
 using System.Web;
 using System.Net.Http;
-using System.IdentityModel.Tokens.Jwt;
 using System.Diagnostics;
 using System.Windows;
 using Newtonsoft.Json.Converters;
@@ -14,6 +13,9 @@ using System.Drawing;
 using Intuit.Ipp.Data;
 using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
+using System.Net;
+using System;
+using System.Security.Policy;
 
 namespace WpfOcrInvoiceExtractor
 {
@@ -136,9 +138,9 @@ namespace WpfOcrInvoiceExtractor
                     PageSegMode.SingleBlock);
 
             InvoiceItemsTable itemTable = ProcessItemsTable(tablePage, (double)bill.Line[0].Amount);
+            tablePage.Dispose();
             bill.Line[0].DetailType = LineDetailTypeEnum.AccountBasedExpenseLineDetail;
             bill.Line[0].Description = "Default description";
-            bill.Line[0].AnyIntuitObject = lineDetail;
             return (bill, itemTable);
         }
 
@@ -174,6 +176,12 @@ namespace WpfOcrInvoiceExtractor
         }
 
 
+        static TaxCode GST;// = CachedTaxCodeList.First(tc => tc.Name == "G");
+        static TaxCode PST; //= CachedTaxCodeList.First(tc => tc.Name == "P");
+        static TaxCode COMB; //= CachedTaxCodeList.First(tc => tc.Name == "S");
+        static TaxCode NON; //= CachedTaxCodeList.First(tc => tc.Name == "Out of scope");
+
+
         public static async Task<bool> CreateNewBillToQbo(Bitmap invoiceImage, InvoiceTemplate invoiceTemplate)
         {
             //Check the tokens, if authentication failed for any reason, end and return false
@@ -200,13 +208,55 @@ namespace WpfOcrInvoiceExtractor
             string billAccount = jobType == "EV-CHARGERS" ? "91" : "92";
             string billClass = jobType == "SERVICE" ? "533420" :"533421";
 
+            var TxnDetailObj = new TxnTaxDetail()
+            {
+                TxnTaxCodeRef = new ReferenceType(),
+                TotalTax = (decimal)Math.Round((double)billToSend.TotalAmt - itemsTable.PreTaxSubtotal, 2),
+            };
+          
+
+            List<Line> TaxLines = [];
+
+            if (itemsTable.IncludesGST)
+            {
+                TxnDetailObj.TxnTaxCodeRef.Value = GST.Id;
+                TaxLines.Add(new()
+                {
+                    DetailType = LineDetailTypeEnum.TaxLineDetail,
+                    Amount = (decimal)itemsTable.CalculatedGSTAmount
+                });
+            }
+
+            if (itemsTable.IncludesPST)
+            {
+                TxnDetailObj.TxnTaxCodeRef.Value = TxnDetailObj.TxnTaxCodeRef.Value == GST.Id ? COMB.Id : PST.Id;
+                TaxLines.Add(new()
+                {
+                    DetailType = LineDetailTypeEnum.TaxLineDetail,
+                    Amount = (decimal)itemsTable.CalculatedPSTAmount
+                });
+            }
+
+            if (TaxLines.Count == 0)
+            {
+                TxnDetailObj.TxnTaxCodeRef.Value = NON.Id;
+                TaxLines.Add(new()
+                {
+                    DetailType = LineDetailTypeEnum.TaxLineDetail,
+                    Amount = 0
+                });
+            }
+
+            TxnDetailObj.TaxLine = [.. TaxLines];
+
+
+            //Possible to just send a Bill object?
             var billObject = new
             {
                 billToSend.TxnDate,
                 billToSend.DocNumber,
                 Line = new[] {
                 new {
-                    AccountRef = new {value = 64}, //Change
                     billToSend.Line[0].Description, 
                     DetailType = "AccountBasedExpenseLineDetail", 
                     Amount = billToSend.TotalAmt, 
@@ -214,19 +264,16 @@ namespace WpfOcrInvoiceExtractor
                         AccountRef = new {value = billAccount},  
                         ClassRef = new {value = billClass}, 
                         TaxCodeRef = new {value = 1}, //Probably correct, double check
-                        TaxAmount = Math.Round((double)billToSend.TotalAmt - itemsTable.PreTaxSubtotal, 2), //Very likely wrong, need to see 
                     },
                 }},
-                TxnTaxDetail = new { 
-                    //To fill out
-                },
+                TxnTaxDetail = TxnDetailObj,
                 VendorRef = new { value = invoiceTemplate.Vendor.Id, name = invoiceTemplate.Vendor.DisplayName },
             };
             
-            return false;
+
             var billObjectJson = JsonConvert.SerializeObject(billObject);
 
-            HttpRequestMessage requestMessage = new HttpRequestMessage(HttpMethod.Post, url);
+            HttpRequestMessage requestMessage = new(HttpMethod.Post, url);
             requestMessage.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("bearer", Tokens.AccessToken);
             requestMessage.Content = new StringContent(billObjectJson.ToString());
             requestMessage.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
@@ -391,7 +438,7 @@ namespace WpfOcrInvoiceExtractor
             JObject QueryResponse = JObject.Parse(await response.Content.ReadAsStringAsync());
             JArray accounts = (JArray)QueryResponse["QueryResponse"]["Account"];
 
-            CachedAccountList = accounts.Select(QboAccount => new Class() { Name = (string)QboAccount["Name"], Id = (string)QboAccount["Id"] }).ToList();
+            CachedAccountList = accounts.Select(QboAccount => new Account() { Name = (string)QboAccount["Name"], Id = (string)QboAccount["Id"] }).ToList();
             return true;
         }
 
@@ -445,6 +492,10 @@ namespace WpfOcrInvoiceExtractor
             JArray taxCodes = (JArray)QueryResponse["QueryResponse"]["TaxCode"];
 
             CachedTaxCodeList = taxCodes.Select(taxCode => new TaxCode() { Name = (string)taxCode["Name"], Id = (string)taxCode["Id"] }).ToList();
+            GST = CachedTaxCodeList.First(tc => tc.Name == "G");
+            PST = CachedTaxCodeList.First(tc => tc.Name == "P");
+            COMB = CachedTaxCodeList.First(tc => tc.Name == "S");
+            NON = CachedTaxCodeList.First(tc => tc.Name == "Out of scope");
             return true;
         }
 

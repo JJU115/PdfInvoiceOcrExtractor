@@ -58,6 +58,7 @@
                     <ComboBoxItem>Invoice Number</ComboBoxItem>
                     <ComboBoxItem>Vendor Identification</ComboBoxItem>
                     <ComboBoxItem>Items Table</ComboBoxItem>
+                    <ComboBoxItem>Work Order Number</ComboBoxItem>
                 </ComboBox>
             </StackPanel>
         </Grid>

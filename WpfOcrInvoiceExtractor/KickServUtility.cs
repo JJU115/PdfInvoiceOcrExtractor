@@ -15,7 +15,7 @@ namespace WpfOcrInvoiceExtractor
 
     class KickServUtility
     {
-        public static readonly string FUNCTION_URL = "https://kickservclient.azurewebsites.net/api/GetKickServJobType?code=l4lJSiPkzDySX2EcRlRzOjqrP-ASoi0HTaLcXMFeY94OAzFuNQRMfA%3D%3D";
+        public static readonly string FUNCTION_URL = "https://kickservclient.azurewebsites.net/api/GetKickServJobType?code=vsRrEr5QLHRdbUdeBuxjvFU4I7j-p7TLgBoW5YVD9dQEAzFu_lDFTg%3D%3D";
         public static KickServAuth? KickServAuth = null;
         private static HttpClient? StaticClient = null;
 

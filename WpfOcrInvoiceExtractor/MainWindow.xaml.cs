@@ -70,6 +70,12 @@ namespace WpfOcrInvoiceExtractor
                 regionList.Add(new ImageRegion(f, i));
             }
 
+            if (e.Key == Key.S)
+            {
+                string test = await KickServUtility.GetJobType("20005");
+                Debug.WriteLine(test);
+            }
+
             if (e.Key == Key.R)
             {
                 
@@ -199,9 +205,11 @@ namespace WpfOcrInvoiceExtractor
 
         private async void NewImportButton_Click(object sender, RoutedEventArgs e)
         {
-            OpenFileDialog openFileDialog = new OpenFileDialog();
-            openFileDialog.Multiselect = true;
-            openFileDialog.Filter = "PDF Files|*.pdf";
+            OpenFileDialog openFileDialog = new()
+            {
+                Multiselect = true,
+                Filter = "PDF Files|*.pdf"
+            };
 
             bool? result = openFileDialog.ShowDialog();
 
