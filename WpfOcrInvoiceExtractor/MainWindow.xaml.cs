@@ -11,6 +11,7 @@ using System.Windows.Controls;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using Tesseract;
+using Task = System.Threading.Tasks.Task;
 
 
 namespace WpfOcrInvoiceExtractor
@@ -139,16 +140,15 @@ namespace WpfOcrInvoiceExtractor
         {
             var template = (InvoiceTemplate)(sender as System.Windows.Controls.Image).DataContext;
             if (template.Vendor.DisplayName == "New Vendor Invoice Template") AddNewTemplate();
-            else
-            {
-
-            }
         }
+
 
         private void AddNewTemplate()
         {
-            OpenFileDialog openFileDialog = new OpenFileDialog();
-            openFileDialog.Filter = "PDF Files|*.pdf";
+            OpenFileDialog openFileDialog = new()
+            {
+                Filter = "PDF Files|*.pdf"
+            };
 
             bool? result = openFileDialog.ShowDialog();
 
@@ -157,7 +157,6 @@ namespace WpfOcrInvoiceExtractor
             {
                 templateViewer = new InvoiceTemplateViewer(openFileDialog.FileName);
                 bool? viewerResult = templateViewer.ShowDialog();
-
 
                 if (viewerResult == true) {
                     JpegBitmapEncoder encoder = new();
@@ -215,10 +214,17 @@ namespace WpfOcrInvoiceExtractor
 
             if (result == true)
             {
-                //These will all be grouped into one method later
-                await QBOUtility.PopulateAccountsList();
-                await QBOUtility.PopulateQBOClassList();
-                await QBOUtility.PopulateQBOTaxCodesList();
+                if (!await QBOUtility.CheckTokens())
+                {
+                    MessageBox.Show("Quickbooks authentication failed");
+                    return;
+                }
+
+                Task qboRefTask = Task.WhenAll([
+                QBOUtility.GetVendorList(),
+                QBOUtility.PopulateAccountsList(),
+                QBOUtility.PopulateQBOClassList(),
+                QBOUtility.PopulateQBOTaxCodesList()]);
 
                 List<Bitmap> pdfImages = ConvertPdfsToImages(openFileDialog.FileNames);
                 List<string> failed = new(openFileDialog.FileNames);
@@ -244,7 +250,26 @@ namespace WpfOcrInvoiceExtractor
                     {
                         ImageRegion tableRegion = templateMatch.ImageRegions.Find(ir => ir.BillTopic == BillTopic.ItemsTable)!;
                         failed.RemoveAt(b - (pdfImages.Count - failed.Count));
-                        await QBOUtility.CreateNewBillToQbo(bmp, templateMatch!); //Return a enum? Success, tax mismatch, failed to send...
+                        if (!qboRefTask.IsCompleted) await qboRefTask.ConfigureAwait(false);
+                        QBOUtility.QBOResult billResult = await QBOUtility.CreateNewBillToQbo(bmp, templateMatch!);
+                        switch (billResult)
+                        {
+                            case QBOUtility.QBOResult.UploadSuccess:
+                                Debug.WriteLine("Upload success");
+                                break;
+                            case QBOUtility.QBOResult.UnrecognizedJobType:
+                                Debug.WriteLine("Couldn't recognize job type");
+                                break;
+                            case QBOUtility.QBOResult.QBOAuthFailed:
+                                Debug.WriteLine("QBO auth failed");
+                                break;
+                            case QBOUtility.QBOResult.OCRFailure:
+                                Debug.WriteLine("OCR failure");
+                                break;
+                            case QBOUtility.QBOResult.QBOUploadFailed:
+                                Debug.WriteLine("Upload failed");
+                                break;
+                        }
                     }
                 }
 

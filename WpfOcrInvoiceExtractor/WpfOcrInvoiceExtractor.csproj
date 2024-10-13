@@ -61,9 +61,6 @@
     <None Update="testimages\wesco_264010700_20220521_23275357_9136520875.pdf">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="Tokens.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
 
 </Project>
