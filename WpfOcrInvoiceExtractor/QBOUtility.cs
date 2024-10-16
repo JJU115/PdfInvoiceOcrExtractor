@@ -13,16 +13,13 @@ using System.Drawing;
 using Intuit.Ipp.Data;
 using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
-using System.Net;
-using System;
-using System.Security.Policy;
-using Task = System.Threading.Tasks.Task;
+using System.Text;
 
 namespace WpfOcrInvoiceExtractor
 {
     partial class QBOUtility
     {
-        readonly static string BASE_URL = "https://sandbox-quickbooks.api.intuit.com";
+        readonly static string BASE_URL = "https://quickbooks.api.intuit.com";
         public static QboAuthTokens? Tokens { get; set; } = null;
         public static OAuth2Client? Client { get; set; } = null;
         private static HttpClient? StaticClient = null;
@@ -83,14 +80,9 @@ namespace WpfOcrInvoiceExtractor
             else if (!accessValid)
             {
                 Client ??= new(Tokens.ClientId, Tokens.ClientSecret, Tokens.RedirectUrl, Tokens.Environment);
-                TokenResponse response = await Client.RefreshTokenAsync(Tokens.RefreshToken);
-                
-                if (response.HttpErrorReason.Contains("invalid_grant"))
-                {
+                TokenResponse response = await Client.RefreshTokenAsync(Tokens.RefreshToken);             
 
-                }
-
-                if (!response.IsError)
+                if (response.IsError)
                 {
                     if (response.HttpErrorReason.Contains("invalid_grant"))
                     {
@@ -99,19 +91,19 @@ namespace WpfOcrInvoiceExtractor
                         authWindow.Show();
                         await authFinished;
                         return authFinished.Result;
-                    } 
-                    else
-                    {
-                        Tokens.AccessToken = response.AccessToken;
-                        Tokens.RefreshToken = response.RefreshToken;
-                        Tokens.AccessTokenExpiresIn = DateTime.Now.AddSeconds(response.AccessTokenExpiresIn);
-                        Tokens.RefreshTokenExpiresIn = DateTime.Now.AddSeconds(response.RefreshTokenExpiresIn);
-                        WriteTokensAsJson(Tokens);
-                        return true;
                     }
+                    return false;
                                     
+                } 
+                else
+                {
+                    Tokens.AccessToken = response.AccessToken;
+                    Tokens.RefreshToken = response.RefreshToken;
+                    Tokens.AccessTokenExpiresIn = DateTime.Now.AddSeconds(response.AccessTokenExpiresIn);
+                    Tokens.RefreshTokenExpiresIn = DateTime.Now.AddSeconds(response.RefreshTokenExpiresIn);
+                    WriteTokensAsJson(Tokens);
+                    return true;
                 }
-                return false;
             }
             else
             {
@@ -133,7 +125,7 @@ namespace WpfOcrInvoiceExtractor
                 switch (region.BillTopic)
                 {
                     case BillTopic.Amount:
-                        bill.Line[0].Amount = Convert.ToDecimal(page.GetText().Trim().Replace(",", "")); //Remove all non numeric characters
+                        bill.TotalAmt = Convert.ToDecimal(page.GetText().Trim().Replace(",", "")); //Remove all non numeric characters
                         break;
                     case BillTopic.BillDate:
                         bill.TxnDate = DateTime.Parse(page.GetText().Trim()); //Different possible date formats...
@@ -181,7 +173,7 @@ namespace WpfOcrInvoiceExtractor
 
                 //If this is not a numeric value, skip
                 MatchCollection matches = Regex.Matches(lastValue, "[^0-9.]");
-                if (matches.Count > 0) continue;
+                if (matches.Count > 0 || line.Contains("SUB TOTAL", StringComparison.CurrentCultureIgnoreCase)) continue;
 
                 //Pull GST and PST amounts if they exist in the amount column, GST=5%, PST=7%
                 if (table.IncludesGST && line.Contains("GST LIABILITY")) table.SourceGSTAmount = Double.Parse(lastValue);
@@ -191,6 +183,11 @@ namespace WpfOcrInvoiceExtractor
             return table;
         }
 
+        static Account? MaterialsPurchasedAccount;
+        static Account? VanTruckStock;
+
+        static Class? ServiceClass;
+        static Class? SolarClass;
 
         static TaxCode? GST;
         static TaxCode? PST;
@@ -209,10 +206,6 @@ namespace WpfOcrInvoiceExtractor
 
         public static async Task<QBOResult> CreateNewBillToQbo(Bitmap invoiceImage, InvoiceTemplate invoiceTemplate)
         {
-            //Check the tokens, if authentication failed for any reason, end and return false
-            if (!await CheckTokens()) return QBOResult.QBOAuthFailed;
-            //Otherwise we are now fully authorized to make requests
-
             //Prepare the request
             StaticClient ??= new HttpClient();
 
@@ -240,12 +233,37 @@ namespace WpfOcrInvoiceExtractor
 
 
             string jobType = await KickServUtility.GetJobType(page.GetText().Trim());
+            page.Dispose();
             if (!acceptedClassCodes.Contains(jobType)) return QBOResult.UnrecognizedJobType;
 
 
             //Highly customized to Wesco right now
-            string billAccount = jobType == "EV-CHARGERS" ? "91" : "92";
-            string billClass = jobType == "SERVICE" ? "533420" :"533421";
+            string billAccount = jobType == "EV-CHARGERS" ? MaterialsPurchasedAccount!.Id : VanTruckStock!.Id;
+            string billClass = jobType == "SERVICE" ? ServiceClass!.Id :SolarClass!.Id;
+
+            StringBuilder sb = new();
+            JsonWriter billWriter = new JsonTextWriter(new StringWriter());
+            //https://www.newtonsoft.com/json/help/html/WriteJsonWithJsonTextWriter.htm
+            billWriter.WriteStartObject();
+
+            var billObject = new
+            {
+                billToSend.TxnDate,
+                billToSend.DocNumber,
+                Line = new[] {
+                new {
+                    billToSend.Line[0].Description,
+                    DetailType = "AccountBasedExpenseLineDetail",
+                    Amount = billToSend.TotalAmt,
+                    AccountBasedExpenseLineDetail = new {
+                        AccountRef = new {value = billAccount},
+                        ClassRef = new {value = billClass},
+                        TaxCodeRef = new {value = TxnDetailObj.TxnTaxCodeRef.Value}, //Probably correct, double check
+                    },
+                }},
+                TxnTaxDetail = TxnDetailObj,
+                VendorRef = new { value = invoiceTemplate.Vendor.Id, name = invoiceTemplate.Vendor.DisplayName },
+            };
 
             var TxnDetailObj = new TxnTaxDetail()
             {
@@ -261,17 +279,28 @@ namespace WpfOcrInvoiceExtractor
                 TxnDetailObj.TxnTaxCodeRef.Value = GST!.Id;
                 TaxLines.Add(new()
                 {
+                    DetailTypeSpecified = true,
                     DetailType = LineDetailTypeEnum.TaxLineDetail,
+                    AnyIntuitObject = new TaxLineDetail()
+                    {
+                        TaxRateRef = GST.SalesTaxRateList.TaxRateDetail[0].TaxRateRef //More robust checking
+                    },
                     Amount = (decimal)itemsTable.CalculatedGSTAmount
                 });
             }
 
             if (itemsTable.IncludesPST)
             {
-                TxnDetailObj.TxnTaxCodeRef.Value = TxnDetailObj.TxnTaxCodeRef.Value == GST!.Id ? COMB!.Id : PST!.Id;
+                var taxMatch = TxnDetailObj.TxnTaxCodeRef.Value == GST!.Id ? COMB! : PST!;
+                TxnDetailObj.TxnTaxCodeRef.Value = taxMatch.Id;
                 TaxLines.Add(new()
                 {
+                    DetailTypeSpecified = true,
                     DetailType = LineDetailTypeEnum.TaxLineDetail,
+                    AnyIntuitObject = new TaxLineDetail()
+                    {
+                        TaxRateRef = taxMatch.SalesTaxRateList.TaxRateDetail[0].TaxRateRef //More robust checking
+                    },
                     Amount = (decimal)itemsTable.CalculatedPSTAmount
                 });
             }
@@ -281,7 +310,12 @@ namespace WpfOcrInvoiceExtractor
                 TxnDetailObj.TxnTaxCodeRef.Value = NON!.Id;
                 TaxLines.Add(new()
                 {
+                    DetailTypeSpecified = true,
                     DetailType = LineDetailTypeEnum.TaxLineDetail,
+                    AnyIntuitObject = new TaxLineDetail()
+                    {
+                        TaxRateRef = NON.SalesTaxRateList.TaxRateDetail[0].TaxRateRef
+                    },
                     Amount = 0
                 });
             }
@@ -289,32 +323,9 @@ namespace WpfOcrInvoiceExtractor
             TxnDetailObj.TaxLine = [.. TaxLines];
 
 
-            //Possible to just send a Bill object?
-            var billObject = new
-            {
-                billToSend.TxnDate,
-                billToSend.DocNumber,
-                Line = new[] {
-                new {
-                    billToSend.Line[0].Description, 
-                    DetailType = "AccountBasedExpenseLineDetail", 
-                    Amount = billToSend.TotalAmt, 
-                    AccountBasedExpenseLineDetail = new {
-                        AccountRef = new {value = billAccount},  
-                        ClassRef = new {value = billClass}, 
-                        TaxCodeRef = new {value = 1}, //Probably correct, double check
-                    },
-                }},
-                TxnTaxDetail = TxnDetailObj,
-                VendorRef = new { value = invoiceTemplate.Vendor.Id, name = invoiceTemplate.Vendor.DisplayName },
-            };
-            
-
-            var billObjectJson = JsonConvert.SerializeObject(billObject);
-
             HttpRequestMessage requestMessage = new(HttpMethod.Post, url);
             requestMessage.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("bearer", Tokens.AccessToken);
-            requestMessage.Content = new StringContent(billObjectJson.ToString());
+            requestMessage.Content = new StringContent(sb.ToString());
             requestMessage.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
 
             //Receive and parse the response
@@ -428,9 +439,9 @@ namespace WpfOcrInvoiceExtractor
         }
 
 
-        public static async Task<JArray> QBOQueryRequest(string qboObject)
+        public static async Task<JArray> QBOQueryRequest(string qboObject, string query)
         {
-            string url = $"{BASE_URL}/v3/company/{Tokens!.RealmId}/query?query=select Name, Id from {qboObject}";
+            string url = $"{BASE_URL}/v3/company/{Tokens!.RealmId}/query?query={query}";
             StaticClient ??= new HttpClient();
             HttpRequestMessage requestMessage = new HttpRequestMessage(HttpMethod.Get, url);
             requestMessage.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("bearer", Tokens.AccessToken);
@@ -452,20 +463,7 @@ namespace WpfOcrInvoiceExtractor
 
             if (CachedVendorList.Count > 0) return CachedVendorList;
 
-            string url = $"{BASE_URL}/v3/company/{Tokens!.RealmId}/query?query=select DisplayName, Id from vendor";      
-            
-            HttpRequestMessage requestMessage = new HttpRequestMessage(HttpMethod.Get, url);
-            requestMessage.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("bearer", Tokens.AccessToken);
-
-            if (!StaticClient.DefaultRequestHeaders.Any(rh => rh.Value.Contains("application/json") && rh.Key == "Accept"))
-                StaticClient.DefaultRequestHeaders.Add("Accept", "application/json");
-
-            HttpResponseMessage response = await StaticClient.SendAsync(requestMessage);
-
-            string queryResult = await response.Content.ReadAsStringAsync();
-            JObject QueryResponse = JObject.Parse(queryResult);
-            JArray vendors = (JArray)QueryResponse["QueryResponse"]["Vendor"];
-
+            JArray vendors = await QBOQueryRequest("Vendor", "select DisplayName, Id from vendor");
             CachedVendorList = vendors.Select(vendor => new Vendor() { DisplayName = (string)vendor["DisplayName"], Id = (string)vendor["Id"] }).ToList();
             return CachedVendorList;
         }
@@ -476,8 +474,10 @@ namespace WpfOcrInvoiceExtractor
         {
             if (CachedAccountList.Count > 0) return false;
 
-            JArray accounts = await QBOQueryRequest("Account");
+            JArray accounts = await QBOQueryRequest("Account", "select name, id from Account");
             CachedAccountList = accounts.Select(QboAccount => new Account() { Name = (string)QboAccount["Name"], Id = (string)QboAccount["Id"] }).ToList();
+            MaterialsPurchasedAccount = CachedAccountList.First(acc => acc.Name == "Materials Purchased");
+            VanTruckStock = CachedAccountList.First(acc => acc.Name == "Van and Truck Stock");
             return true;
         }
 
@@ -487,8 +487,10 @@ namespace WpfOcrInvoiceExtractor
         public async static Task<bool> PopulateQBOClassList()
         {
             if (CachedClassList.Count > 0) return false;
-            JArray classes = await QBOQueryRequest("Class");
+            JArray classes = await QBOQueryRequest("Class", "select name, id from Class");
             CachedClassList = classes.Select(QboClass => new Class() { Name = (string)QboClass["Name"], Id = (string)QboClass["Id"] }).ToList();
+            ServiceClass = CachedClassList.First(cl => cl.Name == "Service");
+            SolarClass = CachedClassList.First(cl => cl.Name == "Solar");
             return true;
         }
 
@@ -498,15 +500,22 @@ namespace WpfOcrInvoiceExtractor
         {
 
             if (CachedTaxCodeList.Count > 0) return false;
-            JArray taxCodes = await QBOQueryRequest("TaxCode");
+            JArray taxCodes = await QBOQueryRequest("TaxCode", "select name, id, salestaxratelist from TaxCode");
 
-            CachedTaxCodeList = taxCodes.Select(taxCode => new TaxCode() { Name = (string)taxCode["Name"], Id = (string)taxCode["Id"] }).ToList();
+            CachedTaxCodeList = taxCodes.Select(taxCode => new TaxCode() { Name = (string)taxCode["Name"], Id = (string)taxCode["Id"], SalesTaxRateList = JsonConvert.DeserializeObject<TaxRateList>(taxCode["SalesTaxRateList"].ToString()) }).ToList();
             GST = CachedTaxCodeList.First(tc => tc.Name == "G");
             PST = CachedTaxCodeList.First(tc => tc.Name == "P");
             COMB = CachedTaxCodeList.First(tc => tc.Name == "S");
-            NON = CachedTaxCodeList.First(tc => tc.Name == "OUT_OF_SCOPE");
+            NON = CachedTaxCodeList.First(tc => tc.Name == "OUT_OF_SCOPE" || tc.Name == "out of scope");
             return true;
         }
 
+        public static async Task<Bill> GetBill()
+        {
+            JArray bills = await QBOQueryRequest("Bill", "select * from Bill where DocNumber='405586'");
+            Debug.WriteLine(bills[0].ToString());
+            Bill b = JsonConvert.DeserializeObject<Bill>(bills[0].ToString());
+            return b;
+        }
     }
 }

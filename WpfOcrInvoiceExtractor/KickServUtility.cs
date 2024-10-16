@@ -9,8 +9,8 @@ namespace WpfOcrInvoiceExtractor
 {
     internal class KickServAuth
     {
-        public string? KickservToken { get; set; }
-        public string? KickservAccount { get; set; }
+        public string KickservToken { get; set; } = "";
+        public string KickservAccount { get; set; } = "";
     }
 
     class KickServUtility
@@ -36,7 +36,6 @@ namespace WpfOcrInvoiceExtractor
             }
             else
             {
-                File.Create(".\\KickServ.json");
                 string serialized = System.Text.Json.JsonSerializer.Serialize(new KickServAuth(), new JsonSerializerOptions()
                 {
                     WriteIndented = true,

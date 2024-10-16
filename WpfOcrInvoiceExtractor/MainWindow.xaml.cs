@@ -79,23 +79,34 @@ namespace WpfOcrInvoiceExtractor
 
             if (e.Key == Key.R)
             {
-                
+
                 RegionViewer rv = new(regionList, []);
                 rv.Show();
             }
-            else if (e.Key == Key.F) {
+            else if (e.Key == Key.F)
+            {
                 Vendor wesco = new()
                 {
                     Id = "58"
                 };
-               //await QBOUtility.CreateNewBillToQbo(new InvoiceTemplate());
-            } else if (e.Key == Key.L)
+                //await QBOUtility.CreateNewBillToQbo(new InvoiceTemplate());
+            }
+            else if (e.Key == Key.L)
             {
                 this.RetrieveTemplateData();
-            } else if (e.Key == Key.V)
+            }
+            else if (e.Key == Key.V)
             {
                 List<Vendor> vendors = await QBOUtility.GetVendorList();
                 Debug.WriteLine(vendors);
+            }
+            else if (e.Key == Key.B)
+            {
+                if (await QBOUtility.CheckTokens())
+                {
+                    Bill prodBill = await QBOUtility.GetBill();
+                    Debug.WriteLine(prodBill);
+                }
             }
         }
 
@@ -107,14 +118,14 @@ namespace WpfOcrInvoiceExtractor
             XmlSerializer serializer = new XmlSerializer(typeof(InvoiceTemplate));
             var list = Directory.GetFiles($"{localDataPath}\\QBO_Invoice_Parser").Where(f => f.EndsWith("xml")).Select(f =>
             {
-                FileStream fs = new FileStream(f, FileMode.Open);
+                FileStream fs = new(f, FileMode.Open);
                 InvoiceTemplate it = (InvoiceTemplate)serializer.Deserialize(fs);
                 it.ImageRegions.ForEach(ir => ir.Image = new CroppedBitmap(it.Display, ir.SourceRegion));
                 it.Display.DecodePixelHeight = 200;
                 return it;
             });
             List<InvoiceTemplate> l = list.ToList();
-            InvoiceTemplate addTemplate = new InvoiceTemplate();
+            InvoiceTemplate addTemplate = new();
             string fileName = @"C:\Users\Justin\source\repos\WpfOcrInvoiceExtractor\WpfOcrInvoiceExtractor\testimages\add-template.png";
             Uri uri = new Uri(fileName, UriKind.RelativeOrAbsolute);
             addTemplate.Display = new BitmapImage(uri);

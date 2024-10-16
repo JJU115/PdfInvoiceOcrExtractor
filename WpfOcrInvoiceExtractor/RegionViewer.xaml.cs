@@ -1,14 +1,10 @@
 ﻿using Intuit.Ipp.Data;
 using System.Diagnostics;
-using System.Drawing;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Xml.Serialization;
 using Tesseract;
 
 namespace WpfOcrInvoiceExtractor
@@ -43,8 +39,7 @@ namespace WpfOcrInvoiceExtractor
         private void regionClicked(object sender, MouseButtonEventArgs e) {
             // Get the index of the clicked image - sender.content.index
             ImageRegion rgn = (ImageRegion)((ContentPresenter) sender).Content;
-            var selector = new RegionDataTemplateSelector();
-            selector.SelectedIndex = rgn.Index;
+            var selector = new RegionDataTemplateSelector { SelectedIndex = rgn.Index };
             regionList.ItemTemplateSelector = selector;
             ImageEditorControl.Invoice_SourceUpdated(new WriteableBitmap(imageSources[rgn.Index].Image));
             this.focusedRegion = rgn.Index;
@@ -79,18 +74,19 @@ namespace WpfOcrInvoiceExtractor
             bool numberSelected = imageSources.Where(img => img.BillTopic == BillTopic.BillNumber).Any();
             bool vendorSelected = imageSources.Where(img => img.BillTopic == BillTopic.Vendor).Any();
             bool tableSelected = imageSources.Where(img => img.BillTopic == BillTopic.ItemsTable).Any();
+            bool WOSelected = imageSources.Where(img => img.BillTopic == BillTopic.WONumber).Any();
 
-            if (!amountSelected && !dateSelected && !numberSelected && !vendorSelected && !tableSelected)
+            if (!amountSelected || !dateSelected || !numberSelected || !vendorSelected || !tableSelected || !WOSelected)
             {
                 MessageBox.Show("Missing bill topic assignment", "Missing assignments", MessageBoxButton.OK, MessageBoxImage.Information, MessageBoxResult.OK);
                 return;
             }
 
             //What if multiple images have the same bill topic?
-
+            await QBOUtility.CheckTokens();
             List<Vendor> vendors = await QBOUtility.GetVendorList();
             //Dialog to get user to select a vendor
-            VendorSelectDialog vsd = new VendorSelectDialog(vendors.Where(v => !existingVendors.Contains(v.Id)).ToList());
+            VendorSelectDialog vsd = new(vendors.Where(v => !existingVendors.Contains(v.Id)).ToList());
             bool? vendorResult = vsd.ShowDialog();          
             if (vendorResult == true) {
                 this.selectedVendor = (Vendor)vsd.vendorBox.SelectedItem;
