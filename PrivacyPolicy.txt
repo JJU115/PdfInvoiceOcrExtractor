@@ -1,0 +1,11 @@
+Privacy Policy
+
+This app connects with QBO and will read various details related to your Quickbooks environment only if authorization details are provided by you.
+This app reads the following:
+- List of accounts
+- Vendors
+- Tax rates and tax codes
+- Classes
+
+Invoices provided as templates will be stored on the computer running the application and are not replicated anywhere else.
+These can be deleted at any time
