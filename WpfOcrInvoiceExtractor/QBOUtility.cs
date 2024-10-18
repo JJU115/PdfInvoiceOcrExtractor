@@ -14,12 +14,14 @@ using Intuit.Ipp.Data;
 using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
 using System.Text;
+using Tabula.Writers;
 
 namespace WpfOcrInvoiceExtractor
 {
     partial class QBOUtility
     {
-        readonly static string BASE_URL = "https://quickbooks.api.intuit.com";
+        readonly static string SANDBOX_BASE_URL = "https://sandbox-quickbooks.api.intuit.com";
+        readonly static string PROD_BASE_URL = "https://quickbooks.api.intuit.com";
         public static QboAuthTokens? Tokens { get; set; } = null;
         public static OAuth2Client? Client { get; set; } = null;
         private static HttpClient? StaticClient = null;
@@ -210,7 +212,7 @@ namespace WpfOcrInvoiceExtractor
             StaticClient ??= new HttpClient();
 
             //Set the body and headers
-            string url = $"{BASE_URL}/v3/company/{Tokens!.RealmId}/bill?minorversion=73";
+            string url = $"{SANDBOX_BASE_URL}/v3/company/{Tokens!.RealmId}/bill?minorversion=73";
             StaticClient.SetBearerToken(Tokens.AccessToken);
 
             (Bill billToSend, InvoiceItemsTable itemsTable) = ResolveOnImageRegions(invoiceImage, invoiceTemplate.ImageRegions);
@@ -230,8 +232,6 @@ namespace WpfOcrInvoiceExtractor
             }
             
 
-
-
             string jobType = await KickServUtility.GetJobType(page.GetText().Trim());
             page.Dispose();
             if (!acceptedClassCodes.Contains(jobType)) return QBOResult.UnrecognizedJobType;
@@ -240,88 +240,86 @@ namespace WpfOcrInvoiceExtractor
             //Highly customized to Wesco right now
             string billAccount = jobType == "EV-CHARGERS" ? MaterialsPurchasedAccount!.Id : VanTruckStock!.Id;
             string billClass = jobType == "SERVICE" ? ServiceClass!.Id :SolarClass!.Id;
+            var taxMatch = itemsTable.IncludesGST && itemsTable.IncludesPST ? COMB! : itemsTable.IncludesGST ? GST! : itemsTable.IncludesPST ? PST! : NON!;
 
             StringBuilder sb = new();
             JsonWriter billWriter = new JsonTextWriter(new StringWriter());
-            //https://www.newtonsoft.com/json/help/html/WriteJsonWithJsonTextWriter.htm
+
+            void writeProperty(string name, string value)
+            {
+                billWriter.WritePropertyName("DetailType");
+                billWriter.WriteValue("AccountBasedExpenseLineDetail");
+            }
+
+            void writeTaxLine(TaxCode code, double amnt)
+            {
+                billWriter.WriteStartObject();
+                billWriter.WritePropertyName("Amount");
+                billWriter.WriteValue(amnt);
+                writeProperty("DetailType", "TaxLineDetail");
+                billWriter.WritePropertyName("TaxLineDetail");
+                billWriter.WriteStartObject();
+                billWriter.WritePropertyName("TaxRateRef");
+                billWriter.WriteStartObject();
+                writeProperty("value", code.SalesTaxRateList.TaxRateDetail[0].TaxRateRef.Value);
+                billWriter.WriteEndObject();
+                billWriter.WriteEndObject();
+                billWriter.WriteEndObject();
+            }
+
+            billWriter.WriteStartObject();
+            billWriter.WritePropertyName("TxnDate");
+            billWriter.WriteValue(billToSend.TxnDate);
+            writeProperty("DocNumber", billToSend.DocNumber);
+            billWriter.WritePropertyName("Line");
+            billWriter.WriteStartArray();
+            billWriter.WriteStartObject();
+            writeProperty("Description", billToSend.Line[0].Description);
+            writeProperty("DetailType", "AccountBasedExpenseLineDetail");
+            billWriter.WritePropertyName("Amount");
+            billWriter.WriteValue(billToSend.TotalAmt);
+
+            billWriter.WritePropertyName("AccountBasedExpenseLineDetail");
             billWriter.WriteStartObject();
 
-            var billObject = new
-            {
-                billToSend.TxnDate,
-                billToSend.DocNumber,
-                Line = new[] {
-                new {
-                    billToSend.Line[0].Description,
-                    DetailType = "AccountBasedExpenseLineDetail",
-                    Amount = billToSend.TotalAmt,
-                    AccountBasedExpenseLineDetail = new {
-                        AccountRef = new {value = billAccount},
-                        ClassRef = new {value = billClass},
-                        TaxCodeRef = new {value = TxnDetailObj.TxnTaxCodeRef.Value}, //Probably correct, double check
-                    },
-                }},
-                TxnTaxDetail = TxnDetailObj,
-                VendorRef = new { value = invoiceTemplate.Vendor.Id, name = invoiceTemplate.Vendor.DisplayName },
-            };
+            billWriter.WritePropertyName("AccountRef");
+            billWriter.WriteStartObject();
+            writeProperty("value", billAccount);
+            billWriter.WriteEndObject();
 
-            var TxnDetailObj = new TxnTaxDetail()
-            {
-                TxnTaxCodeRef = new ReferenceType(),
-                TotalTax = (decimal)Math.Round((double)billToSend.TotalAmt - itemsTable.PreTaxSubtotal, 2),
-            };
-          
+            billWriter.WritePropertyName("ClassRef");
+            billWriter.WriteStartObject();
+            writeProperty("value", billClass);
+            billWriter.WriteEndObject();
 
-            List<Line> TaxLines = [];
+            billWriter.WritePropertyName("TaxCodeRef");
+            billWriter.WriteStartObject();
+            writeProperty("value", taxMatch.Id);
+            billWriter.WriteEndObject(); //End TaxCodeRef
+            billWriter.WriteEndObject(); //End AccountBasedExpenseLineDetail
+            billWriter.WriteEndObject(); //End Line[0] object
 
-            if (itemsTable.IncludesGST)
+            billWriter.WriteEndArray(); //End Line array
+
+            //Write the tax lines
+            if (taxMatch.Id != NON!.Id)
             {
-                TxnDetailObj.TxnTaxCodeRef.Value = GST!.Id;
-                TaxLines.Add(new()
-                {
-                    DetailTypeSpecified = true,
-                    DetailType = LineDetailTypeEnum.TaxLineDetail,
-                    AnyIntuitObject = new TaxLineDetail()
-                    {
-                        TaxRateRef = GST.SalesTaxRateList.TaxRateDetail[0].TaxRateRef //More robust checking
-                    },
-                    Amount = (decimal)itemsTable.CalculatedGSTAmount
-                });
+                billWriter.WritePropertyName("TxnTaxDetail");
+                billWriter.WritePropertyName("TaxLine");
+                billWriter.WriteStartArray();
+                if (itemsTable.IncludesGST) writeTaxLine(GST!, itemsTable.CalculatedGSTAmount);
+                if (itemsTable.IncludesPST) writeTaxLine(PST!, itemsTable.CalculatedPSTAmount);
+                billWriter.WriteEndArray();
             }
+            
+            //Write vendor then finsih bill
+            billWriter.WritePropertyName("VendorRef");
+            billWriter.WriteStartObject();
+            writeProperty("value", invoiceTemplate.Vendor.Id);
+            writeProperty("name", invoiceTemplate.Vendor.DisplayName);
+            billWriter.WriteEndObject();
 
-            if (itemsTable.IncludesPST)
-            {
-                var taxMatch = TxnDetailObj.TxnTaxCodeRef.Value == GST!.Id ? COMB! : PST!;
-                TxnDetailObj.TxnTaxCodeRef.Value = taxMatch.Id;
-                TaxLines.Add(new()
-                {
-                    DetailTypeSpecified = true,
-                    DetailType = LineDetailTypeEnum.TaxLineDetail,
-                    AnyIntuitObject = new TaxLineDetail()
-                    {
-                        TaxRateRef = taxMatch.SalesTaxRateList.TaxRateDetail[0].TaxRateRef //More robust checking
-                    },
-                    Amount = (decimal)itemsTable.CalculatedPSTAmount
-                });
-            }
-
-            if (TaxLines.Count == 0)
-            {
-                TxnDetailObj.TxnTaxCodeRef.Value = NON!.Id;
-                TaxLines.Add(new()
-                {
-                    DetailTypeSpecified = true,
-                    DetailType = LineDetailTypeEnum.TaxLineDetail,
-                    AnyIntuitObject = new TaxLineDetail()
-                    {
-                        TaxRateRef = NON.SalesTaxRateList.TaxRateDetail[0].TaxRateRef
-                    },
-                    Amount = 0
-                });
-            }
-
-            TxnDetailObj.TaxLine = [.. TaxLines];
-
+            billWriter.WriteEndObject(); //End the bill
 
             HttpRequestMessage requestMessage = new(HttpMethod.Post, url);
             requestMessage.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("bearer", Tokens.AccessToken);
