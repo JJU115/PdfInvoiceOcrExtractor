@@ -110,7 +110,7 @@ namespace WpfOcrInvoiceExtractor
             }
         }
 
-        public List<InvoiceTemplate> RetrieveTemplateData()
+        public static List<InvoiceTemplate> RetrieveTemplateData()
         {
             string localDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             if (!Directory.Exists($"{localDataPath}\\QBO_Invoice_Parser")) Directory.CreateDirectory($"{localDataPath}\\QBO_Invoice_Parser");
@@ -235,10 +235,14 @@ namespace WpfOcrInvoiceExtractor
                 QBOUtility.GetVendorList(),
                 QBOUtility.PopulateAccountsList(),
                 QBOUtility.PopulateQBOClassList(),
-                QBOUtility.PopulateQBOTaxCodesList()]);
+                QBOUtility.PopulateQBOTaxCodesList(),
+                QBOUtility.GetSalesTerm()]);
 
-                List<Bitmap> pdfImages = ConvertPdfsToImages(openFileDialog.FileNames);
+                Task<Bitmap>[] convertImageTasks = openFileDialog.FileNames.Select(name => Task<Bitmap>.Factory.StartNew(() => ConvertPdfsToImages(name))).ToArray();
                 List<string> failed = new(openFileDialog.FileNames);
+                Task.WaitAll(convertImageTasks);
+                List<Bitmap> pdfImages = convertImageTasks.Select(t => t.Result).ToList();
+
 
                 for (int b=0; b<pdfImages.Count; b++) {
                     Bitmap bmp = pdfImages[b];
@@ -259,14 +263,14 @@ namespace WpfOcrInvoiceExtractor
 
                     if (templateMatch != null)
                     {
-                        ImageRegion tableRegion = templateMatch.ImageRegions.Find(ir => ir.BillTopic == BillTopic.ItemsTable)!;
-                        failed.RemoveAt(b - (pdfImages.Count - failed.Count));
+                        ImageRegion tableRegion = templateMatch.ImageRegions.Find(ir => ir.BillTopic == BillTopic.ItemsTable)!;                     
                         if (!qboRefTask.IsCompleted) await qboRefTask.ConfigureAwait(false);
                         QBOUtility.QBOResult billResult = await QBOUtility.CreateNewBillToQbo(bmp, templateMatch!);
                         switch (billResult)
                         {
                             case QBOUtility.QBOResult.UploadSuccess:
                                 Debug.WriteLine("Upload success");
+                                failed.RemoveAt(b - (pdfImages.Count - failed.Count));
                                 break;
                             case QBOUtility.QBOResult.UnrecognizedJobType:
                                 Debug.WriteLine("Couldn't recognize job type");
@@ -289,21 +293,18 @@ namespace WpfOcrInvoiceExtractor
             }
         }
 
-        public List<Bitmap> ConvertPdfsToImages(string[] filePaths)
+        public static Bitmap ConvertPdfsToImages(string filePath)
         {
             int desired_dpi = 300;
-            List<Bitmap> pdfImages = new List<Bitmap>();
+            Bitmap pdfImage;
 
             using (var rasterizer = new GhostscriptRasterizer())
             {
-                foreach (string path in filePaths)
-                {
-                    rasterizer.Open(path);
-                    var img = rasterizer.GetPage(desired_dpi, 1);
-                    pdfImages.Add(new Bitmap(img));
-                }
+                rasterizer.Open(filePath);
+                var img = rasterizer.GetPage(desired_dpi, 1);
+                pdfImage = new Bitmap(img);              
             }
-            return pdfImages;
+            return pdfImage;
         }
     }
 }

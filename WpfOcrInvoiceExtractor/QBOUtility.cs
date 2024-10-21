@@ -14,7 +14,6 @@ using Intuit.Ipp.Data;
 using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
 using System.Text;
-using Tabula.Writers;
 
 namespace WpfOcrInvoiceExtractor
 {
@@ -86,7 +85,7 @@ namespace WpfOcrInvoiceExtractor
 
                 if (response.IsError)
                 {
-                    if (response.HttpErrorReason.Contains("invalid_grant"))
+                    if (response.Error == "invalid_grant")
                     {
                         MessageBox.Show("You must authenticate to QuickBooks Online", "Authentication needed", MessageBoxButton.OK, MessageBoxImage.Information, MessageBoxResult.OK);
                         authWindow.Closed += (s, a) => authFinished.Start();
@@ -120,7 +119,6 @@ namespace WpfOcrInvoiceExtractor
             
             foreach (ImageRegion region in imageRegions)
             {
-
                 Tesseract.Page page = engine.Process(invoiceImage, 
                     new Tesseract.Rect(region.SourceRegion.X, region.SourceRegion.Y, region.SourceRegion.Width, region.SourceRegion.Height));
                 
@@ -149,8 +147,6 @@ namespace WpfOcrInvoiceExtractor
 
             InvoiceItemsTable itemTable = ProcessItemsTable(tablePage, (double)bill.Line[0].Amount);
             tablePage.Dispose();
-            bill.Line[0].DetailType = LineDetailTypeEnum.AccountBasedExpenseLineDetail;
-            bill.Line[0].Description = "Default description";
             return (bill, itemTable);
         }
 
@@ -191,10 +187,12 @@ namespace WpfOcrInvoiceExtractor
         static Class? ServiceClass;
         static Class? SolarClass;
 
+        static Term? SalesTermRef;
+
         static TaxCode? GST;
         static TaxCode? PST;
         static TaxCode? COMB;
-        static TaxCode? NON;
+        static TaxCode? EXEMPT;
         static readonly string[] acceptedClassCodes = { "SOLAR", "SERVICE", "EV-CHARGERS"};
          
         public enum QBOResult
@@ -230,94 +228,99 @@ namespace WpfOcrInvoiceExtractor
             {
                 return QBOResult.OCRFailure;
             }
-            
 
-            string jobType = await KickServUtility.GetJobType(page.GetText().Trim());
+            string jobNumber = Regex.Replace(page.GetText().Trim(), "[^0-9]", "");
+            string jobType = await KickServUtility.GetJobType(jobNumber);
             page.Dispose();
+            //Could kick off another process here since engine is no longer used
             if (!acceptedClassCodes.Contains(jobType)) return QBOResult.UnrecognizedJobType;
 
 
             //Highly customized to Wesco right now
-            string billAccount = jobType == "EV-CHARGERS" ? MaterialsPurchasedAccount!.Id : VanTruckStock!.Id;
+            string billAccount = jobType == "EV-CHARGERS" || (jobNumber != "19712" && jobNumber != "19713") ? MaterialsPurchasedAccount!.Id : VanTruckStock!.Id;
             string billClass = jobType == "SERVICE" ? ServiceClass!.Id :SolarClass!.Id;
-            var taxMatch = itemsTable.IncludesGST && itemsTable.IncludesPST ? COMB! : itemsTable.IncludesGST ? GST! : itemsTable.IncludesPST ? PST! : NON!;
+            var taxMatch = itemsTable.IncludesGST && itemsTable.IncludesPST ? COMB! : itemsTable.IncludesGST ? GST! : itemsTable.IncludesPST ? PST! : EXEMPT!;
+            double subTotal = (double)billToSend.TotalAmt;
+            if (itemsTable.IncludesGST) subTotal -= itemsTable.SourceGSTAmount;
+            if (itemsTable.IncludesPST) subTotal -= itemsTable.SourcePSTAmount;
 
             StringBuilder sb = new();
-            JsonWriter billWriter = new JsonTextWriter(new StringWriter());
+            JsonWriter billWriter = new JsonTextWriter(new StringWriter(sb));
 
             void writeProperty(string name, string value)
             {
-                billWriter.WritePropertyName("DetailType");
-                billWriter.WriteValue("AccountBasedExpenseLineDetail");
+                billWriter.WritePropertyName(name);
+                billWriter.WriteValue(value);
             }
 
-            void writeTaxLine(TaxCode code, double amnt)
+            void writeDecProperty(string name, double value)
+            {
+                billWriter.WritePropertyName(name);
+                billWriter.WriteValue(value);
+            }
+
+            void writeRefObject(string refName, string value)
+            {
+                billWriter.WritePropertyName(refName);
+                billWriter.WriteStartObject();
+                writeProperty("value", value);
+                billWriter.WriteEndObject();
+            }
+
+            void writeTaxLine(TaxCode code, double invoiceAmount, double taxableAmount)
             {
                 billWriter.WriteStartObject();
-                billWriter.WritePropertyName("Amount");
-                billWriter.WriteValue(amnt);
+                writeDecProperty("Amount", invoiceAmount);
                 writeProperty("DetailType", "TaxLineDetail");
                 billWriter.WritePropertyName("TaxLineDetail");
                 billWriter.WriteStartObject();
-                billWriter.WritePropertyName("TaxRateRef");
-                billWriter.WriteStartObject();
-                writeProperty("value", code.SalesTaxRateList.TaxRateDetail[0].TaxRateRef.Value);
-                billWriter.WriteEndObject();
+                writeRefObject("TaxRateRef", code.PurchaseTaxRateList.TaxRateDetail[0].TaxRateRef.Value);
+                writeDecProperty("NetAmountTaxable", taxableAmount);
                 billWriter.WriteEndObject();
                 billWriter.WriteEndObject();
             }
 
             billWriter.WriteStartObject();
+
+            writeRefObject("SalesTermRef", SalesTermRef!.Id);
+
             billWriter.WritePropertyName("TxnDate");
             billWriter.WriteValue(billToSend.TxnDate);
             writeProperty("DocNumber", billToSend.DocNumber);
             billWriter.WritePropertyName("Line");
             billWriter.WriteStartArray();
             billWriter.WriteStartObject();
-            writeProperty("Description", billToSend.Line[0].Description);
+            writeProperty("Description", "Default description");
             writeProperty("DetailType", "AccountBasedExpenseLineDetail");
-            billWriter.WritePropertyName("Amount");
-            billWriter.WriteValue(billToSend.TotalAmt);
+            writeDecProperty("Amount", subTotal);
 
             billWriter.WritePropertyName("AccountBasedExpenseLineDetail");
             billWriter.WriteStartObject();
 
-            billWriter.WritePropertyName("AccountRef");
-            billWriter.WriteStartObject();
-            writeProperty("value", billAccount);
-            billWriter.WriteEndObject();
-
-            billWriter.WritePropertyName("ClassRef");
-            billWriter.WriteStartObject();
-            writeProperty("value", billClass);
-            billWriter.WriteEndObject();
-
-            billWriter.WritePropertyName("TaxCodeRef");
-            billWriter.WriteStartObject();
-            writeProperty("value", taxMatch.Id);
-            billWriter.WriteEndObject(); //End TaxCodeRef
+            writeRefObject("AccountRef", billAccount);
+            writeRefObject("ClassRef", billClass);
+            writeRefObject("TaxCodeRef", taxMatch.Id);
             billWriter.WriteEndObject(); //End AccountBasedExpenseLineDetail
             billWriter.WriteEndObject(); //End Line[0] object
 
             billWriter.WriteEndArray(); //End Line array
 
             //Write the tax lines
-            if (taxMatch.Id != NON!.Id)
+            if (taxMatch.Id != EXEMPT!.Id)
             {
                 billWriter.WritePropertyName("TxnTaxDetail");
+                billWriter.WriteStartObject();
                 billWriter.WritePropertyName("TaxLine");
                 billWriter.WriteStartArray();
-                if (itemsTable.IncludesGST) writeTaxLine(GST!, itemsTable.CalculatedGSTAmount);
-                if (itemsTable.IncludesPST) writeTaxLine(PST!, itemsTable.CalculatedPSTAmount);
+                if (itemsTable.IncludesGST) writeTaxLine(GST!, itemsTable.SourceGSTAmount, Math.Round(itemsTable.SourceGSTAmount / 0.05, 2));
+                if (itemsTable.IncludesPST) writeTaxLine(PST!, itemsTable.SourcePSTAmount, Math.Round(itemsTable.SourceGSTAmount / 0.07, 2));
                 billWriter.WriteEndArray();
+                billWriter.WriteEndObject();
             }
-            
+
             //Write vendor then finsih bill
-            billWriter.WritePropertyName("VendorRef");
-            billWriter.WriteStartObject();
-            writeProperty("value", invoiceTemplate.Vendor.Id);
-            writeProperty("name", invoiceTemplate.Vendor.DisplayName);
-            billWriter.WriteEndObject();
+            writeRefObject("VendorRef", invoiceTemplate.Vendor.Id);
+            writeProperty("GlobalTaxCalculation", "TaxExcluded");
 
             billWriter.WriteEndObject(); //End the bill
 
@@ -439,7 +442,7 @@ namespace WpfOcrInvoiceExtractor
 
         public static async Task<JArray> QBOQueryRequest(string qboObject, string query)
         {
-            string url = $"{BASE_URL}/v3/company/{Tokens!.RealmId}/query?query={query}";
+            string url = $"{SANDBOX_BASE_URL}/v3/company/{Tokens!.RealmId}/query?query={query}";
             StaticClient ??= new HttpClient();
             HttpRequestMessage requestMessage = new HttpRequestMessage(HttpMethod.Get, url);
             requestMessage.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("bearer", Tokens.AccessToken);
@@ -474,11 +477,14 @@ namespace WpfOcrInvoiceExtractor
 
             JArray accounts = await QBOQueryRequest("Account", "select name, id from Account");
             CachedAccountList = accounts.Select(QboAccount => new Account() { Name = (string)QboAccount["Name"], Id = (string)QboAccount["Id"] }).ToList();
-            MaterialsPurchasedAccount = CachedAccountList.First(acc => acc.Name == "Materials Purchased");
-            VanTruckStock = CachedAccountList.First(acc => acc.Name == "Van and Truck Stock");
+            MaterialsPurchasedAccount = CachedAccountList.First(acc => acc.Name.ToLower().Contains("materials purchased"));
+            VanTruckStock = CachedAccountList.First(acc => acc.Name.ToLower().Contains("van and truck stock"));
             return true;
         }
-
+        /*
+         * 5511	5511 Materials Purchased	Expenses	Supplies & Materials
+         * 5513	5513 Van and Truck Stock	Expenses	Supplies & Materials
+         */
 
         static List<Class> CachedClassList = [];
 
@@ -487,8 +493,8 @@ namespace WpfOcrInvoiceExtractor
             if (CachedClassList.Count > 0) return false;
             JArray classes = await QBOQueryRequest("Class", "select name, id from Class");
             CachedClassList = classes.Select(QboClass => new Class() { Name = (string)QboClass["Name"], Id = (string)QboClass["Id"] }).ToList();
-            ServiceClass = CachedClassList.First(cl => cl.Name == "Service");
-            SolarClass = CachedClassList.First(cl => cl.Name == "Solar");
+            ServiceClass = CachedClassList.First(cl => cl.Name.ToLower() == "service");
+            SolarClass = CachedClassList.First(cl => cl.Name.ToLower() == "solar");
             return true;
         }
 
@@ -498,13 +504,22 @@ namespace WpfOcrInvoiceExtractor
         {
 
             if (CachedTaxCodeList.Count > 0) return false;
-            JArray taxCodes = await QBOQueryRequest("TaxCode", "select name, id, salestaxratelist from TaxCode");
+            JArray taxCodes = await QBOQueryRequest("TaxCode", "select name, id, purchasetaxratelist from TaxCode");
 
-            CachedTaxCodeList = taxCodes.Select(taxCode => new TaxCode() { Name = (string)taxCode["Name"], Id = (string)taxCode["Id"], SalesTaxRateList = JsonConvert.DeserializeObject<TaxRateList>(taxCode["SalesTaxRateList"].ToString()) }).ToList();
+            CachedTaxCodeList = taxCodes.Select(taxCode => new TaxCode() { Name = (string)taxCode["Name"], Id = (string)taxCode["Id"], PurchaseTaxRateList = JsonConvert.DeserializeObject<TaxRateList>(taxCode["PurchaseTaxRateList"].ToString()) }).ToList();
             GST = CachedTaxCodeList.First(tc => tc.Name == "G");
             PST = CachedTaxCodeList.First(tc => tc.Name == "P");
             COMB = CachedTaxCodeList.First(tc => tc.Name == "S");
-            NON = CachedTaxCodeList.First(tc => tc.Name == "OUT_OF_SCOPE" || tc.Name == "out of scope");
+            EXEMPT = CachedTaxCodeList.First(tc => tc.Name == "Exempt");
+            return true;
+        }
+
+        //Assumed to always be Net 30
+        public async static Task<bool> GetSalesTerm()
+        {
+            if (SalesTermRef != null && !String.IsNullOrEmpty(SalesTermRef?.Id)) return false;
+            JArray terms = await QBOQueryRequest("Term", "select * from Term where Name='Net 30'");
+            SalesTermRef = JsonConvert.DeserializeObject<Term>(terms[0].ToString());
             return true;
         }
 

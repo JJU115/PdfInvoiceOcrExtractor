@@ -4,6 +4,7 @@ using System.IO;
 using System.Net.Http;
 using System.Windows;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace WpfOcrInvoiceExtractor
 {
@@ -52,7 +53,6 @@ namespace WpfOcrInvoiceExtractor
         {
             if (KickServAuth == null) GetAuthDetails();
             StaticClient ??= new HttpClient();
-
             string url = $"{FUNCTION_URL}&APIToken={KickServAuth!.KickservToken}&SLUG={KickServAuth.KickservAccount}&jobNumber={jobNumber}";
             HttpRequestMessage requestMessage = new(HttpMethod.Get, url);
 
