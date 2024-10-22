@@ -56,7 +56,7 @@ namespace WpfOcrInvoiceExtractor
         public async Task CompleteOperationAsync()
         {
             // Simulate work being done
-            await Task.Delay(2000);  // Simulate a 2 second operation
+            await Task.Delay(5000);  // Simulate a 2 second operation
             IsInProgress = false;
             IsCompleted = true;
         }

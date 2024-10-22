@@ -6,7 +6,24 @@
         xmlns:local="clr-namespace:WpfOcrInvoiceExtractor"
         mc:Ignorable="d"
         Title="ProgressReporter" Height="450" Width="800">
+    <Window.Resources>
+        <local:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    </Window.Resources>
     <Grid>
-        
+        <ListBox ItemsSource="{Binding Operations}" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Orientation="Horizontal" Margin="10">
+                        <TextBlock Text="{Binding OperationName}" Width="200" VerticalAlignment="Center"/>
+
+                        <!-- Spinner or Loading Icon -->
+                        <ProgressBar Width="100" Height="20" IsIndeterminate="True" Visibility="{Binding IsInProgress, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
+                        <!-- Completed Icon -->
+                        <TextBlock Text="✔" Foreground="Green" VerticalAlignment="Center" FontSize="16" Visibility="{Binding IsCompleted, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    </StackPanel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
     </Grid>
 </Window>

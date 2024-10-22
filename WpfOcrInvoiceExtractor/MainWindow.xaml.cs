@@ -56,6 +56,11 @@ namespace WpfOcrInvoiceExtractor
                 await KickServUtility.GetJobType("20005");
             }
 
+            if (e.Key == Key.L) {
+                ProgressReporter pr = new();
+                pr.Show();
+            }
+
             //Store files of template data in this path
             if (e.Key == Key.I) {
                 InvoiceTemplateViewer itv = new(@"testImages\wesco_264010700_20220521_23275357_9136520875.pdf");
@@ -64,7 +69,7 @@ namespace WpfOcrInvoiceExtractor
             }
 
             List<ImageRegion> regionList = new();
-            string sourceDirectory = @"C:\Users\Justin\source\repos\WpfOcrInvoiceExtractor\WpfOcrInvoiceExtractor\testimages";
+            string sourceDirectory = $"{Directory.GetCurrentDirectory()}\\testimages";
             var txtFiles = Directory.EnumerateFiles(sourceDirectory).Where(f => f.EndsWith("jpg"));
 
             for (var i = 0; i < txtFiles.Count(); i++)
@@ -128,7 +133,7 @@ namespace WpfOcrInvoiceExtractor
             });
             List<InvoiceTemplate> l = list.ToList();
             InvoiceTemplate addTemplate = new();
-            string fileName = @"C:\Users\Justin\source\repos\WpfOcrInvoiceExtractor\WpfOcrInvoiceExtractor\testimages\add-template.png";
+            string fileName = $"{Directory.GetCurrentDirectory()}\\testimages\\add-template.png";
             Uri uri = new Uri(fileName, UriKind.RelativeOrAbsolute);
             addTemplate.Display = new BitmapImage(uri);
             addTemplate.Vendor = new Vendor { DisplayName = "New Vendor Invoice Template" };
