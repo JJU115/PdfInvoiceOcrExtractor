@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -19,9 +21,47 @@ namespace WpfOcrInvoiceExtractor
     /// </summary>
     public partial class ProgressReporter : Window
     {
+        public ObservableCollection<OperationViewModel> Operations { get; set; }
+
         public ProgressReporter()
         {
             InitializeComponent();
+            DataContext = this;
+
+            Operations = new ObservableCollection<OperationViewModel>
+            {
+                new OperationViewModel("Operation 1"),
+                new OperationViewModel("Operation 2"),
+                new OperationViewModel("Operation 3")
+            };
+
+            StartOperations();
+        }
+
+        private async void StartOperations()
+        {
+            foreach (var operation in Operations)
+            {
+                await operation.CompleteOperationAsync();
+            }
+        }
+    }
+
+
+    public class BooleanToVisibilityConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is bool boolean)
+            {
+                return boolean ? Visibility.Visible : Visibility.Collapsed;
+            }
+            return Visibility.Collapsed;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
         }
     }
 }

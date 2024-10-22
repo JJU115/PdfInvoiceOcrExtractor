@@ -12,6 +12,8 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using Tesseract;
 using Task = System.Threading.Tasks.Task;
+using UglyToad.PdfPig;
+using UglyToad.PdfPig.Content;
 
 
 namespace WpfOcrInvoiceExtractor
@@ -93,7 +95,7 @@ namespace WpfOcrInvoiceExtractor
             }
             else if (e.Key == Key.L)
             {
-                this.RetrieveTemplateData();
+                RetrieveTemplateData();
             }
             else if (e.Key == Key.V)
             {
@@ -238,10 +240,10 @@ namespace WpfOcrInvoiceExtractor
                 QBOUtility.PopulateQBOTaxCodesList(),
                 QBOUtility.GetSalesTerm()]);
 
-                Task<Bitmap>[] convertImageTasks = openFileDialog.FileNames.Select(name => Task<Bitmap>.Factory.StartNew(() => ConvertPdfsToImages(name))).ToArray();
+                Task<List<Bitmap>>[] convertImageTasks = openFileDialog.FileNames.Select(name => Task<List<Bitmap>>.Factory.StartNew(() => ConvertPdfsToImages(name))).ToArray();
                 List<string> failed = new(openFileDialog.FileNames);
                 Task.WaitAll(convertImageTasks);
-                List<Bitmap> pdfImages = convertImageTasks.Select(t => t.Result).ToList();
+                List<Bitmap> pdfImages = convertImageTasks.Select(task => task.Result).Aggregate((acc, curr) => [.. acc, .. curr]);
 
 
                 for (int b=0; b<pdfImages.Count; b++) {
@@ -293,18 +295,26 @@ namespace WpfOcrInvoiceExtractor
             }
         }
 
-        public static Bitmap ConvertPdfsToImages(string filePath)
+        public static List<Bitmap> ConvertPdfsToImages(string filePath)
         {
             int desired_dpi = 300;
-            Bitmap pdfImage;
+            List<Bitmap> pdfImages = []; ;
 
-            using (var rasterizer = new GhostscriptRasterizer())
+            using (PdfDocument document = PdfDocument.Open(@filePath))
             {
-                rasterizer.Open(filePath);
-                var img = rasterizer.GetPage(desired_dpi, 1);
-                pdfImage = new Bitmap(img);              
+                using (var rasterizer = new GhostscriptRasterizer())
+                {
+                    rasterizer.Open(filePath);
+                    for (int p = 0; p < document.NumberOfPages; p++)
+                    {
+                        var img = rasterizer.GetPage(desired_dpi, 1);
+                        pdfImages.Add(new Bitmap(img));
+                    }
+                }
+                    
             }
-            return pdfImage;
+
+            return pdfImages;
         }
     }
 }

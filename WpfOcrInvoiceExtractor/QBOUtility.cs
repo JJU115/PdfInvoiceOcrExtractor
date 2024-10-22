@@ -510,7 +510,7 @@ namespace WpfOcrInvoiceExtractor
             GST = CachedTaxCodeList.First(tc => tc.Name == "G");
             PST = CachedTaxCodeList.First(tc => tc.Name == "P");
             COMB = CachedTaxCodeList.First(tc => tc.Name == "S");
-            EXEMPT = CachedTaxCodeList.First(tc => tc.Name == "Exempt");
+            EXEMPT = CachedTaxCodeList.First(tc => tc.Name == "E");
             return true;
         }
 
