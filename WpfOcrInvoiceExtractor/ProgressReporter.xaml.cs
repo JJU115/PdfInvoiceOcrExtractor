@@ -23,17 +23,12 @@ namespace WpfOcrInvoiceExtractor
     {
         public ObservableCollection<OperationViewModel> Operations { get; set; }
 
-        public ProgressReporter()
+        public ProgressReporter(IEnumerable<OperationViewModel> uploads)
         {
             InitializeComponent();
             DataContext = this;
 
-            Operations = new ObservableCollection<OperationViewModel>
-            {
-                new OperationViewModel("Operation 1"),
-                new OperationViewModel("Operation 2"),
-                new OperationViewModel("Operation 3")
-            };
+            Operations = new ObservableCollection<OperationViewModel>(uploads);
 
             StartOperations();
         }

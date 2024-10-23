@@ -245,11 +245,14 @@ namespace WpfOcrInvoiceExtractor
                 QBOUtility.PopulateQBOTaxCodesList(),
                 QBOUtility.GetSalesTerm()]);
 
+
                 Task<List<Bitmap>>[] convertImageTasks = openFileDialog.FileNames.Select(name => Task<List<Bitmap>>.Factory.StartNew(() => ConvertPdfsToImages(name))).ToArray();
                 List<string> failed = new(openFileDialog.FileNames);
                 Task.WaitAll(convertImageTasks);
                 List<Bitmap> pdfImages = convertImageTasks.Select(task => task.Result).Aggregate((acc, curr) => [.. acc, .. curr]);
 
+                //Prep the progress reporter
+                ProgressReporter pr = new(openFileDialog.FileNames.Select(name => new OperationViewModel(name)));
 
                 for (int b=0; b<pdfImages.Count; b++) {
                     Bitmap bmp = pdfImages[b];
@@ -277,6 +280,7 @@ namespace WpfOcrInvoiceExtractor
                         {
                             case QBOUtility.QBOResult.UploadSuccess:
                                 Debug.WriteLine("Upload success");
+                                pr.Operations[b].IsCompleted = true;
                                 failed.RemoveAt(b - (pdfImages.Count - failed.Count));
                                 break;
                             case QBOUtility.QBOResult.UnrecognizedJobType:
@@ -299,6 +303,25 @@ namespace WpfOcrInvoiceExtractor
                     MessageBox.Show($"Could not detect a saved template for the following files:\n{failed.Aggregate((acc, curr) => $"{acc}{curr}\n")}", "Invoices failed to process", MessageBoxButton.OK, MessageBoxImage.Information, MessageBoxResult.OK);
             }
         }
+
+
+        public static Dictionary<string, List<Bitmap>> CombineMultiPageInvoices(List<Bitmap> allInvoices, InvoiceTemplate template)
+        {
+            Dictionary<string, List<Bitmap>> invoicePairs = [];
+            ImageRegion invoiceNum = template.ImageRegions.First(reg => reg.BillTopic == BillTopic.BillNumber);
+
+            foreach (Bitmap bmp in allInvoices)
+            {
+                var page = QBOUtility.engine.Process(bmp, new Tesseract.Rect(invoiceNum.SourceRegion.X, invoiceNum.SourceRegion.Y, 
+                    invoiceNum.SourceRegion.Width, invoiceNum.SourceRegion.Height));
+                string num = page.GetText().Trim();
+                if (!invoicePairs.ContainsKey(num)) invoicePairs[num] = [];
+                invoicePairs[num].Add(bmp);
+                page.Dispose();
+            }
+            return invoicePairs;
+        }
+
 
         public static List<Bitmap> ConvertPdfsToImages(string filePath)
         {

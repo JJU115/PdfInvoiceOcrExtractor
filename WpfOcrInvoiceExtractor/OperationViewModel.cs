@@ -12,6 +12,7 @@ namespace WpfOcrInvoiceExtractor
     {
         private bool _isInProgress;
         private bool _isCompleted;
+        private bool _isFailed;
         private string _operationName;
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -46,6 +47,16 @@ namespace WpfOcrInvoiceExtractor
             }
         }
 
+        public bool IsFailed
+        {
+            get => _isFailed;
+            set
+            {
+                _isFailed = value;
+                OnPropertyChanged();
+            }
+        }
+
         public OperationViewModel(string operationName)
         {
             OperationName = operationName;
@@ -53,13 +64,6 @@ namespace WpfOcrInvoiceExtractor
             IsCompleted = false;
         }
 
-        public async Task CompleteOperationAsync()
-        {
-            // Simulate work being done
-            await Task.Delay(5000);  // Simulate a 2 second operation
-            IsInProgress = false;
-            IsCompleted = true;
-        }
 
         protected void OnPropertyChanged([CallerMemberName] string name = null)
         {
