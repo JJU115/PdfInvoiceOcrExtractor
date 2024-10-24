@@ -1,10 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
+﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace WpfOcrInvoiceExtractor
 {
@@ -14,6 +9,7 @@ namespace WpfOcrInvoiceExtractor
         private bool _isCompleted;
         private bool _isFailed;
         private string _operationName;
+        private string _failedReason;
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -23,6 +19,16 @@ namespace WpfOcrInvoiceExtractor
             set
             {
                 _operationName = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string FailedReason
+        {
+            get => _failedReason;
+            set
+            {
+                _failedReason = value;
                 OnPropertyChanged();
             }
         }

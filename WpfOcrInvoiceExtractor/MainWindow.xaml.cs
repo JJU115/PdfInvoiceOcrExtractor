@@ -57,7 +57,7 @@ namespace WpfOcrInvoiceExtractor
             }
 
             if (e.Key == Key.L) {
-                ProgressReporter pr = new();
+                ProgressReporter pr = new([]);
                 pr.Show();
             }
 
@@ -252,7 +252,8 @@ namespace WpfOcrInvoiceExtractor
                 List<Bitmap> pdfImages = convertImageTasks.Select(task => task.Result).Aggregate((acc, curr) => [.. acc, .. curr]);
 
                 //Prep the progress reporter
-                ProgressReporter pr = new(openFileDialog.FileNames.Select(name => new OperationViewModel(name)));
+                ProgressReporter pr = new(openFileDialog.FileNames.Select(name => new OperationViewModel(name.Split("\\").Last())));
+                pr.Show();
 
                 for (int b=0; b<pdfImages.Count; b++) {
                     Bitmap bmp = pdfImages[b];
@@ -284,23 +285,28 @@ namespace WpfOcrInvoiceExtractor
                                 failed.RemoveAt(b - (pdfImages.Count - failed.Count));
                                 break;
                             case QBOUtility.QBOResult.UnrecognizedJobType:
-                                Debug.WriteLine("Couldn't recognize job type");
+                                pr.Operations[b].IsFailed= true;
+                                pr.Operations[b].FailedReason = "Couldn't recognize job type";
                                 break;
                             case QBOUtility.QBOResult.QBOAuthFailed:
-                                Debug.WriteLine("QBO auth failed");
+                                pr.Operations[b].IsFailed = true;
+                                pr.Operations[b].FailedReason = "QBO authorization failed";
                                 break;
                             case QBOUtility.QBOResult.OCRFailure:
-                                Debug.WriteLine("OCR failure");
+                                pr.Operations[b].IsFailed = true;
+                                pr.Operations[b].FailedReason = "OCR failure";
                                 break;
                             case QBOUtility.QBOResult.QBOUploadFailed:
-                                Debug.WriteLine("Upload failed");
+                                pr.Operations[b].IsFailed = true;
+                                pr.Operations[b].FailedReason = "Upload failed";
                                 break;
                         }
+                    } else
+                    {
+                        pr.Operations[b].IsFailed = true;
+                        pr.Operations[b].FailedReason = "Could not detect a saved template";
                     }
                 }
-
-                if (failed.Count > 0)
-                    MessageBox.Show($"Could not detect a saved template for the following files:\n{failed.Aggregate((acc, curr) => $"{acc}{curr}\n")}", "Invoices failed to process", MessageBoxButton.OK, MessageBoxImage.Information, MessageBoxResult.OK);
             }
         }
 

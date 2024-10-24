@@ -5,25 +5,35 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:WpfOcrInvoiceExtractor"
         mc:Ignorable="d"
-        Title="ProgressReporter" Height="450" Width="800">
+        Title="ProgressReporter" Height="800" Width="300">
     <Window.Resources>
         <local:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
     </Window.Resources>
+    <!--Window should not be resizable-->
     <Grid>
-        <ListBox ItemsSource="{Binding Operations}" HorizontalAlignment="Center" VerticalAlignment="Center">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <ListBox ItemsSource="{Binding Operations}" Grid.ColumnSpan="3">
             <ListBox.ItemTemplate>
                 <DataTemplate>
-                    <StackPanel Orientation="Horizontal" Margin="10">
-                        <TextBlock Text="{Binding OperationName}" Width="200" VerticalAlignment="Center"/>
-
-                        <!-- Spinner or Loading Icon -->
-                        <ProgressBar Width="100" Height="20" IsIndeterminate="True" Visibility="{Binding IsInProgress, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    <StackPanel Orientation="Horizontal" Margin="10" >
+                        <TextBlock Text="{Binding OperationName}" Grid.Column="0" />
+                        <!--Error text underneath here in red-->
+                        
+                        <!-- Spinner or Loading Icon - Is there a way to not explicitly set the width and just use the grid columns? -->
+                        <ProgressBar Width="100" Height="20" IsIndeterminate="True" Grid.Column="2" Visibility="{Binding IsInProgress, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
                         <!-- Completed Icon -->
-                        <TextBlock Text="✔" Foreground="Green" VerticalAlignment="Center" FontSize="16" Visibility="{Binding IsCompleted, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        <TextBlock Text="O" Foreground="Green" Grid.Column="2" VerticalAlignment="Center" FontSize="16" Visibility="{Binding IsCompleted, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        <TextBlock Text="X" Foreground="DarkRed" Grid.Column="2" VerticalAlignment="Center" FontSize="16" Visibility="{Binding IsFailed, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                     </StackPanel>
                 </DataTemplate>
             </ListBox.ItemTemplate>
         </ListBox>
+        
+        <!--Cancel button somewhere here?-->
+        
     </Grid>
 </Window>

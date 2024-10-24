@@ -30,16 +30,8 @@ namespace WpfOcrInvoiceExtractor
 
             Operations = new ObservableCollection<OperationViewModel>(uploads);
 
-            StartOperations();
         }
 
-        private async void StartOperations()
-        {
-            foreach (var operation in Operations)
-            {
-                await operation.CompleteOperationAsync();
-            }
-        }
     }
 
 
